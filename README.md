@@ -10,13 +10,17 @@ started, no restart needed to try ideas.
 
 ## Features
 
-- 🎨 **~46 theme variables** grouped into collapsible categories (primary
+- 🎨 **~47 theme variables** grouped into collapsible categories (primary
   colors, backgrounds, text, sidebar, cards & shape, typography, status
   colors, switches, sliders, dividers, dialogs, label badges)
+- 🌗 **Light/Dark mode editing** - edit shared base values once, then switch
+  to Light or Dark to add mode-specific overrides, with a one-click "copy
+  from other mode" starting point
 - 👀 **Live mockup preview** - a self-contained sample dashboard (sidebar,
   cards, toggle, slider, badges) that updates instantly as you edit, without
   touching your real dashboard
-- 📥 **Import** an existing flat theme YAML to keep editing it
+- 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
+  keep editing it
 - 📋 **Export** via clipboard copy or `.yaml` file download
 - 💾 Autosaves your work-in-progress to browser `localStorage` so a refresh
   won't lose your edits
@@ -65,9 +69,10 @@ Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 6. Restart Home Assistant, then select your theme under
    **Profile → Theme**
 
-> **Note:** this card only edits *flat* themes (a single variable set, no
-> separate `modes: light/dark` block) in v1. Light/dark mode support is
-> tracked as a future enhancement - see [Contributing](CONTRIBUTING.md).
+> **Tip:** the "Base (Both)" tab holds mode-independent values. Switch to
+> "Light" or "Dark" to add overrides just for that mode - only fields you
+> actually touch there are written to the `modes:` block, everything else
+> keeps inheriting the base value.
 
 ## Why no direct "save to server"?
 

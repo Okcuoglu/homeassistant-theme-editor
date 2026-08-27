@@ -8,7 +8,128 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.2.0";
+
+/* ---------------------------------------------------------------------- */
+/* Built-in starter presets (library)                                     */
+/* ---------------------------------------------------------------------- */
+
+const PRESETS = [
+  {
+    id: "warm-amber-technical",
+    name: "Warm Amber Technical",
+    description: "Cozy warm brown/anthracite base, amber accent, sharp technical edges.",
+    values: {
+      "primary-color": "#E8892B",
+      "accent-color": "#FF9E42",
+      "dark-primary-color": "#B8621A",
+      "light-primary-color": "#3A2A1E",
+      "primary-background-color": "#221A15",
+      "secondary-background-color": "#2E241C",
+      "card-background-color": "#2C2118",
+      "app-header-background-color": "#1B1410",
+      "app-header-text-color": "#F5E6D8",
+      "primary-text-color": "#F5E6D8",
+      "secondary-text-color": "#D9B99A",
+      "disabled-text-color": "#7A6A5C",
+      "sidebar-icon-color": "#D9B99A",
+      "sidebar-text-color": "#F5E6D8",
+      "sidebar-background-color": "#1B1410",
+      "sidebar-selected-icon-color": "#FF9E42",
+      "sidebar-selected-text-color": "#FF9E42",
+      "sidebar-border-color": "#3A2A1E",
+      "ha-card-border-radius": "2px",
+      "ha-card-border-width": "1px",
+      "ha-card-border-color": "#4A3624",
+      "ha-card-background": "#2C2118",
+      "state-active-color": "#FF9E42",
+      "state-inactive-color": "#7A6A5C",
+      "error-color": "#E8452B",
+      "warning-color": "#E8B92B",
+      "success-color": "#7CB342",
+      "switch-checked-color": "#FF9E42",
+      "switch-checked-track-color": "#B8621A",
+      "slider-color": "#FF9E42",
+      "divider-color": "#3A2A1E",
+    },
+  },
+  {
+    id: "cyber-cyan",
+    name: "Cyber Cyan",
+    description: "Dark, futuristic HUD look - near-black base, glowing cyan accent.",
+    values: {
+      "primary-color": "#00E5FF",
+      "accent-color": "#00B8D4",
+      "dark-primary-color": "#0097A7",
+      "light-primary-color": "#84FFFF",
+      "primary-background-color": "#0A0E12",
+      "secondary-background-color": "#111820",
+      "card-background-color": "#0F1620",
+      "app-header-background-color": "#060A0D",
+      "app-header-text-color": "#E0F7FA",
+      "primary-text-color": "#E0F7FA",
+      "secondary-text-color": "#7FB8C4",
+      "disabled-text-color": "#3E5158",
+      "sidebar-icon-color": "#7FB8C4",
+      "sidebar-text-color": "#E0F7FA",
+      "sidebar-background-color": "#060A0D",
+      "sidebar-selected-icon-color": "#00E5FF",
+      "sidebar-selected-text-color": "#00E5FF",
+      "sidebar-border-color": "#16232B",
+      "ha-card-border-radius": "2px",
+      "ha-card-border-width": "1px",
+      "ha-card-border-color": "#173039",
+      "ha-card-background": "#0F1620",
+      "state-active-color": "#00E5FF",
+      "state-inactive-color": "#3E5158",
+      "error-color": "#FF5252",
+      "warning-color": "#FFD740",
+      "success-color": "#00E676",
+      "switch-checked-color": "#00E5FF",
+      "switch-checked-track-color": "#0097A7",
+      "slider-color": "#00E5FF",
+      "divider-color": "#16232B",
+    },
+  },
+  {
+    id: "minimal-light",
+    name: "Minimal Light",
+    description: "Clean, bright, understated - soft grays with a single calm blue accent.",
+    values: {
+      "primary-color": "#3B82F6",
+      "accent-color": "#2563EB",
+      "dark-primary-color": "#1D4ED8",
+      "light-primary-color": "#BFDBFE",
+      "primary-background-color": "#F7F8FA",
+      "secondary-background-color": "#EFF1F4",
+      "card-background-color": "#FFFFFF",
+      "app-header-background-color": "#FFFFFF",
+      "app-header-text-color": "#1F2937",
+      "primary-text-color": "#1F2937",
+      "secondary-text-color": "#6B7280",
+      "disabled-text-color": "#C0C4CC",
+      "sidebar-icon-color": "#6B7280",
+      "sidebar-text-color": "#1F2937",
+      "sidebar-background-color": "#FFFFFF",
+      "sidebar-selected-icon-color": "#3B82F6",
+      "sidebar-selected-text-color": "#3B82F6",
+      "sidebar-border-color": "#E5E7EB",
+      "ha-card-border-radius": "10px",
+      "ha-card-border-width": "1px",
+      "ha-card-border-color": "#E5E7EB",
+      "ha-card-background": "#FFFFFF",
+      "state-active-color": "#3B82F6",
+      "state-inactive-color": "#C0C4CC",
+      "error-color": "#DC2626",
+      "warning-color": "#D97706",
+      "success-color": "#16A34A",
+      "switch-checked-color": "#3B82F6",
+      "switch-checked-track-color": "#1D4ED8",
+      "slider-color": "#3B82F6",
+      "divider-color": "#E5E7EB",
+    },
+  },
+];
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -261,6 +382,7 @@ class ThemeEditorCard extends HTMLElement {
     this._values = {};
     this._modeValues = { light: {}, dark: {} };
     this._activeMode = null; // null = base (both modes), or "light" / "dark"
+    this._previewDevice = "desktop"; // "desktop" | "mobile"
     this._themeName = "my_custom_theme";
     this._openGroups = new Set([FIELD_GROUPS[0].id]);
   }
@@ -294,6 +416,7 @@ class ThemeEditorCard extends HTMLElement {
         this._values = parsed.values || {};
         this._modeValues = parsed.modeValues || { light: {}, dark: {} };
         this._themeName = parsed.themeName || "my_custom_theme";
+        this._previewDevice = parsed.previewDevice || "desktop";
       }
     } catch (e) {
       // ignore corrupt storage
@@ -308,6 +431,7 @@ class ThemeEditorCard extends HTMLElement {
           values: this._values,
           modeValues: this._modeValues,
           themeName: this._themeName,
+          previewDevice: this._previewDevice,
         })
       );
     } catch (e) {
@@ -328,6 +452,7 @@ class ThemeEditorCard extends HTMLElement {
             <span>Theme Editor</span>
           </div>
           <div class="header-actions">
+            <button class="btn-flat" id="btn-presets">Presets</button>
             <button class="btn-flat" id="btn-import">Import</button>
             <button class="btn-flat" id="btn-reset">Reset</button>
           </div>
@@ -356,7 +481,14 @@ class ThemeEditorCard extends HTMLElement {
             : ""
         }
 
-        <div class="preview-wrap" id="preview-wrap">
+        <div class="preview-toolbar">
+          <span class="preview-label">Preview</span>
+          <div class="device-toggle">
+            <button class="device-btn ${this._previewDevice === "desktop" ? "active" : ""}" data-device="desktop" title="Desktop preview">🖥</button>
+            <button class="device-btn ${this._previewDevice === "mobile" ? "active" : ""}" data-device="mobile" title="Mobile preview">📱</button>
+          </div>
+        </div>
+        <div class="preview-wrap ${this._previewDevice === "mobile" ? "mobile" : ""}" id="preview-wrap">
           ${this._previewHtml()}
         </div>
 
@@ -496,6 +628,14 @@ class ThemeEditorCard extends HTMLElement {
       });
     });
 
+    root.querySelectorAll(".device-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._previewDevice = btn.dataset.device;
+        this._saveToStorage();
+        this._render();
+      });
+    });
+
     const copyModeBtn = root.getElementById("btn-copy-mode");
     if (copyModeBtn) {
       copyModeBtn.addEventListener("click", () => {
@@ -545,6 +685,7 @@ class ThemeEditorCard extends HTMLElement {
     });
 
     root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
+    root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
 
     root.getElementById("btn-copy").addEventListener("click", async () => {
       const yaml = buildYaml(this._themeName, this._values, this._modeValues);
@@ -575,6 +716,60 @@ class ThemeEditorCard extends HTMLElement {
     setTimeout(() => {
       if (el.textContent === msg) el.textContent = "";
     }, 3000);
+  }
+
+  _openPresetsDialog() {
+    const existing = this.shadowRoot.getElementById("presets-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "presets-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="dialog">
+        <div class="dialog-title">Starter presets</div>
+        <div class="dialog-sub">Loading a preset replaces your current base colors (Light/Dark overrides are kept). This can't be undone from here - export first if you want to keep your current work.</div>
+        <div class="preset-list">
+          ${PRESETS.map(
+            (p) => `
+            <div class="preset-item">
+              <div class="preset-swatches">
+                ${["primary-color", "primary-background-color", "card-background-color", "accent-color"]
+                  .map((k) => `<span class="preset-swatch" style="background:${p.values[k] || "#333"}"></span>`)
+                  .join("")}
+              </div>
+              <div class="preset-info">
+                <div class="preset-name">${p.name}</div>
+                <div class="preset-desc">${p.description}</div>
+              </div>
+              <button class="btn" data-preset="${p.id}">Load</button>
+            </div>
+          `
+          ).join("")}
+        </div>
+        <div class="dialog-actions">
+          <button class="btn-flat" id="presets-cancel">Close</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    overlay.querySelector("#presets-cancel").addEventListener("click", () => overlay.remove());
+    overlay.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const preset = PRESETS.find((p) => p.id === btn.dataset.preset);
+        if (!preset) return;
+        this._values = { ...preset.values };
+        this._themeName = preset.id.replace(/-/g, "_");
+        this._activeMode = null;
+        this._openGroups = new Set(
+          FIELD_GROUPS.filter((g) => g.fields.some((f) => preset.values[f.key])).map((g) => g.id)
+        );
+        this._saveToStorage();
+        overlay.remove();
+        this._render();
+      });
+    });
   }
 
   _openImportDialog() {
@@ -713,9 +908,33 @@ class ThemeEditorCard extends HTMLElement {
       }
 
       /* Live mockup preview - scoped to its own CSS vars, not the real dashboard */
+      .preview-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+      .preview-label { font-size: 12px; color: var(--secondary-text-color, #888); text-transform: uppercase; letter-spacing: 0.04em; }
+      .device-toggle { display: flex; border: 1px solid var(--divider-color, #444); border-radius: 6px; overflow: hidden; }
+      .device-btn {
+        border: none; background: transparent; cursor: pointer;
+        padding: 4px 10px; font-size: 13px; border-right: 1px solid var(--divider-color, #444);
+        filter: grayscale(1); opacity: 0.6;
+      }
+      .device-btn:last-child { border-right: none; }
+      .device-btn.active { background: rgba(127,127,127,0.15); filter: none; opacity: 1; }
+
       .preview-wrap {
         margin-bottom: 18px; border-radius: 8px; overflow: hidden;
         border: 1px solid var(--divider-color, #333);
+      }
+      .preview-wrap.mobile { display: flex; justify-content: center; padding: 16px; background: rgba(0,0,0,0.15); }
+      .preview-wrap.mobile .mockup {
+        width: 300px; border-radius: 22px; overflow: hidden;
+        border: 6px solid #000; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      }
+      .preview-wrap.mobile .mockup-sidebar { display: none; }
+      .preview-wrap.mobile .mockup-body { flex-direction: column; }
+      .preview-wrap.mobile .mockup-main { flex-direction: column; }
+      .preview-wrap.mobile .mockup-card { min-width: 0; }
+      .preview-wrap.mobile .mockup-header {
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; padding: 8px 10px;
       }
       .mockup { background: var(--primary-background-color, #111); font-family: sans-serif; }
       .mockup-header {
@@ -789,6 +1008,22 @@ class ThemeEditorCard extends HTMLElement {
         resize: vertical;
       }
       .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+      .preset-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+      .preset-item {
+        display: flex; align-items: center; gap: 10px;
+        border: 1px solid var(--divider-color, #444); border-radius: 8px; padding: 8px 10px;
+      }
+      .preset-swatches { display: flex; flex-shrink: 0; }
+      .preset-swatch {
+        width: 16px; height: 16px; border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.2);
+        margin-left: -6px;
+      }
+      .preset-swatch:first-child { margin-left: 0; }
+      .preset-info { flex: 1; min-width: 0; }
+      .preset-name { font-size: 13px; font-weight: 600; }
+      .preset-desc { font-size: 11px; color: var(--secondary-text-color, #888); }
     `;
   }
 }

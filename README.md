@@ -19,6 +19,10 @@ started, no restart needed to try ideas.
 - 👀 **Live mockup preview** - a self-contained sample dashboard (sidebar,
   cards, toggle, slider, badges) that updates instantly as you edit, without
   touching your real dashboard
+- 📚 **Starter preset library** - three built-in themes (Warm Amber
+  Technical, Cyber Cyan, Minimal Light) to load as a jumping-off point
+- 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
+  phone-width layout, not just desktop
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
 - 📋 **Export** via clipboard copy or `.yaml` file download

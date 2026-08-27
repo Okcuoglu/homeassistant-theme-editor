@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -71,6 +71,7 @@ const FIELD_GROUPS = [
       { key: "mdc-shape-small", label: "Shape small", type: "text", unit: "px", default: "4px" },
       { key: "mdc-shape-medium", label: "Shape medium", type: "text", unit: "px", default: "4px" },
       { key: "mdc-shape-large", label: "Shape large", type: "text", unit: "px", default: "4px" },
+      { key: "grid-gap", label: "Grid gap (section spacing)", type: "text", unit: "px", default: "32px" },
     ],
   },
   {
@@ -155,52 +156,98 @@ const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
 /* Minimal flat-YAML helpers (no external deps)                           */
 /* ---------------------------------------------------------------------- */
 
-function buildYaml(themeName, values) {
+// Builds a theme YAML block. `modeValues` is optional: { light: {...}, dark: {...} }.
+// Mode-independent (base) vars are written at the top level; only fields the
+// user actually touched in a given mode are written under `modes:`.
+function buildYaml(themeName, values, modeValues) {
   const lines = [`${themeName}:`];
   for (const field of ALL_FIELDS) {
     const val = values[field.key];
     if (val === undefined || val === null || val === "") continue;
     lines.push(`  ${field.key}: "${val}"`);
   }
+
+  const light = (modeValues && modeValues.light) || {};
+  const dark = (modeValues && modeValues.dark) || {};
+  const hasLight = Object.values(light).some((v) => v);
+  const hasDark = Object.values(dark).some((v) => v);
+
+  if (hasLight || hasDark) {
+    lines.push(`  modes:`);
+    if (hasLight) {
+      lines.push(`    light:`);
+      for (const field of ALL_FIELDS) {
+        const val = light[field.key];
+        if (val) lines.push(`      ${field.key}: "${val}"`);
+      }
+    }
+    if (hasDark) {
+      lines.push(`    dark:`);
+      for (const field of ALL_FIELDS) {
+        const val = dark[field.key];
+        if (val) lines.push(`      ${field.key}: "${val}"`);
+      }
+    }
+  }
+
   return lines.join("\n") + "\n";
 }
 
-// Parses a single flat HA theme block: `theme_name:\n  key: "value"\n ...`
-// Deliberately simple - handles the common flat-theme case, ignores nested
-// `modes:` blocks (light/dark) since v1 of this card only edits flat themes.
+// Parses a HA theme block, including an optional `modes: light: / dark:`
+// section. Deliberately simple - assumes consistent 2-space indentation,
+// which is what this card (and most hand-written themes) produce.
 function parseYaml(text) {
   const lines = text.split("\n");
   let themeName = null;
   const values = {};
+  const modeValues = { light: {}, dark: {} };
+  let inModesBlock = false;
+  let currentMode = null;
+
   for (let raw of lines) {
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
     const indentMatch = raw.match(/^(\s*)/);
     const indent = indentMatch ? indentMatch[1].length : 0;
+    const depth = Math.round(indent / 2);
     const trimmed = raw.trim();
     const colonIdx = trimmed.indexOf(":");
     if (colonIdx === -1) continue;
     const key = trimmed.slice(0, colonIdx).trim();
     let value = trimmed.slice(colonIdx + 1).trim();
-
-    if (indent === 0 && !value) {
-      // top-level "theme_name:" line
-      if (!themeName) themeName = key;
-      continue;
-    }
-    if (indent === 0) continue; // skip unexpected top-level scalar
-
-    // strip surrounding quotes
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
       value = value.slice(1, -1);
     }
-    if (value) {
-      values[key] = value;
+
+    if (depth === 0) {
+      if (!value && !themeName) themeName = key;
+      continue;
+    }
+    if (depth === 1) {
+      if (key === "modes" && !value) {
+        inModesBlock = true;
+        currentMode = null;
+        continue;
+      }
+      inModesBlock = false;
+      currentMode = null;
+      if (value) values[key] = value;
+      continue;
+    }
+    if (depth === 2 && inModesBlock) {
+      if ((key === "light" || key === "dark") && !value) {
+        currentMode = key;
+      }
+      continue;
+    }
+    if (depth === 3 && inModesBlock && currentMode) {
+      if (value) modeValues[currentMode][key] = value;
+      continue;
     }
   }
-  return { themeName: themeName || "my_custom_theme", values };
+  return { themeName: themeName || "my_custom_theme", values, modeValues };
 }
 
 /* ---------------------------------------------------------------------- */
@@ -212,8 +259,15 @@ class ThemeEditorCard extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this._values = {};
+    this._modeValues = { light: {}, dark: {} };
+    this._activeMode = null; // null = base (both modes), or "light" / "dark"
     this._themeName = "my_custom_theme";
     this._openGroups = new Set([FIELD_GROUPS[0].id]);
+  }
+
+  // Returns the values object currently being edited: base, or the active mode's overrides.
+  _activeStore() {
+    return this._activeMode ? this._modeValues[this._activeMode] : this._values;
   }
 
   setConfig(config) {
@@ -238,6 +292,7 @@ class ThemeEditorCard extends HTMLElement {
       if (raw) {
         const parsed = JSON.parse(raw);
         this._values = parsed.values || {};
+        this._modeValues = parsed.modeValues || { light: {}, dark: {} };
         this._themeName = parsed.themeName || "my_custom_theme";
       }
     } catch (e) {
@@ -249,7 +304,11 @@ class ThemeEditorCard extends HTMLElement {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ values: this._values, themeName: this._themeName })
+        JSON.stringify({
+          values: this._values,
+          modeValues: this._modeValues,
+          themeName: this._themeName,
+        })
       );
     } catch (e) {
       // storage full / unavailable - non-fatal
@@ -278,6 +337,24 @@ class ThemeEditorCard extends HTMLElement {
           <label for="theme-name">Theme name</label>
           <input id="theme-name" type="text" value="${this._escAttr(this._themeName)}" placeholder="my_custom_theme" />
         </div>
+
+        <div class="mode-bar">
+          <div class="mode-toggle">
+            <button class="mode-btn ${!this._activeMode ? "active" : ""}" data-mode="">Base (Both)</button>
+            <button class="mode-btn ${this._activeMode === "light" ? "active" : ""}" data-mode="light">Light</button>
+            <button class="mode-btn ${this._activeMode === "dark" ? "active" : ""}" data-mode="dark">Dark</button>
+          </div>
+          ${
+            this._activeMode
+              ? `<button class="btn-flat" id="btn-copy-mode">Copy from ${this._activeMode === "light" ? "Dark" : "Light"}</button>`
+              : ""
+          }
+        </div>
+        ${
+          this._activeMode
+            ? `<div class="mode-hint">Editing <strong>${this._activeMode}</strong> mode overrides. Empty fields inherit the Base value shown as placeholder. Click ✕ to clear an override.</div>`
+            : ""
+        }
 
         <div class="preview-wrap" id="preview-wrap">
           ${this._previewHtml()}
@@ -314,15 +391,26 @@ class ThemeEditorCard extends HTMLElement {
   }
 
   _fieldHtml(field) {
-    const val = this._values[field.key] ?? "";
+    const store = this._activeStore();
+    const val = store[field.key] ?? "";
+    const isOverride = !!this._activeMode && val !== "";
+    // In mode-edit context, an empty field inherits the base value - show it as the placeholder / swatch.
+    const inheritedDisplay = this._activeMode ? this._values[field.key] || field.default : field.default;
+    const clearBtn = `<button class="btn-clear ${isOverride ? "" : "hidden"}" data-clear="${field.key}" title="Clear override, inherit base">✕</button>`;
+
     if (field.type === "color") {
-      const colorVal = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val) ? val : field.default;
+      const swatchVal = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val)
+        ? val
+        : /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(inheritedDisplay)
+        ? inheritedDisplay
+        : field.default;
       return `
         <div class="field">
           <label>${field.label}</label>
           <div class="field-input">
-            <input type="color" data-key="${field.key}" value="${colorVal}" />
-            <input type="text" class="hex-text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${field.default}" />
+            <input type="color" data-key="${field.key}" value="${swatchVal}" />
+            <input type="text" class="hex-text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
+            ${clearBtn}
           </div>
         </div>
       `;
@@ -331,7 +419,8 @@ class ThemeEditorCard extends HTMLElement {
       <div class="field">
         <label>${field.label}</label>
         <div class="field-input">
-          <input type="text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${field.default}" />
+          <input type="text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
+          ${clearBtn}
         </div>
       </div>
     `;
@@ -374,9 +463,10 @@ class ThemeEditorCard extends HTMLElement {
   _applyPreviewVars() {
     const wrap = this.shadowRoot.getElementById("preview-wrap");
     if (!wrap) return;
+    const modeOverrides = this._activeMode ? this._modeValues[this._activeMode] : {};
     for (const field of ALL_FIELDS) {
-      const val = this._values[field.key];
-      wrap.style.setProperty(`--${field.key}`, val || field.default);
+      const val = modeOverrides[field.key] || this._values[field.key] || field.default;
+      wrap.style.setProperty(`--${field.key}`, val);
     }
   }
 
@@ -399,23 +489,56 @@ class ThemeEditorCard extends HTMLElement {
       });
     });
 
+    root.querySelectorAll(".mode-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._activeMode = btn.dataset.mode || null;
+        this._render();
+      });
+    });
+
+    const copyModeBtn = root.getElementById("btn-copy-mode");
+    if (copyModeBtn) {
+      copyModeBtn.addEventListener("click", () => {
+        const other = this._activeMode === "light" ? "dark" : "light";
+        this._modeValues[this._activeMode] = { ...this._modeValues[other] };
+        this._saveToStorage();
+        this._render();
+      });
+    }
+
     root.querySelectorAll("input[data-key]").forEach((input) => {
       input.addEventListener("input", (e) => {
         const key = e.target.dataset.key;
         const value = e.target.value;
-        this._values[key] = value;
+        const store = this._activeStore();
+        store[key] = value;
         this._applyPreviewVars();
         this._saveToStorage();
         // keep paired color/hex inputs for the same key in sync
         root.querySelectorAll(`input[data-key="${key}"]`).forEach((other) => {
           if (other !== e.target) other.value = value;
         });
+        // toggle the clear (✕) button without a full re-render, so focus/cursor is preserved while typing
+        const clearBtn = e.target.closest(".field-input")?.querySelector(".btn-clear");
+        if (clearBtn) clearBtn.classList.toggle("hidden", !this._activeMode || value === "");
+      });
+    });
+
+    root.querySelectorAll("[data-clear]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.clear;
+        delete this._activeStore()[key];
+        this._applyPreviewVars();
+        this._saveToStorage();
+        this._render();
       });
     });
 
     root.getElementById("btn-reset").addEventListener("click", () => {
-      if (!confirm("Reset all fields and start a new blank theme?")) return;
+      if (!confirm("Reset all fields (base, light and dark) and start a new blank theme?")) return;
       this._values = {};
+      this._modeValues = { light: {}, dark: {} };
+      this._activeMode = null;
       this._themeName = "my_custom_theme";
       this._saveToStorage();
       this._render();
@@ -424,7 +547,7 @@ class ThemeEditorCard extends HTMLElement {
     root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
 
     root.getElementById("btn-copy").addEventListener("click", async () => {
-      const yaml = buildYaml(this._themeName, this._values);
+      const yaml = buildYaml(this._themeName, this._values, this._modeValues);
       try {
         await navigator.clipboard.writeText(yaml);
         this._showHint("Copied to clipboard.");
@@ -434,7 +557,7 @@ class ThemeEditorCard extends HTMLElement {
     });
 
     root.getElementById("btn-download").addEventListener("click", () => {
-      const yaml = buildYaml(this._themeName, this._values);
+      const yaml = buildYaml(this._themeName, this._values, this._modeValues);
       const blob = new Blob([yaml], { type: "text/yaml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -464,7 +587,7 @@ class ThemeEditorCard extends HTMLElement {
     overlay.innerHTML = `
       <div class="dialog">
         <div class="dialog-title">Import theme YAML</div>
-        <div class="dialog-sub">Paste a flat Home Assistant theme block (theme_name: + key/value list).</div>
+        <div class="dialog-sub">Paste a Home Assistant theme block - flat or with a "modes: light: / dark:" section.</div>
         <textarea id="import-text" rows="10" placeholder="my_theme:\n  primary-color: \"#03a9f4\"\n  ..."></textarea>
         <div class="dialog-actions">
           <button class="btn-flat" id="import-cancel">Cancel</button>
@@ -481,12 +604,16 @@ class ThemeEditorCard extends HTMLElement {
         overlay.remove();
         return;
       }
-      const { themeName, values } = parseYaml(text);
+      const { themeName, values, modeValues } = parseYaml(text);
       this._themeName = themeName;
       this._values = values;
-      // open every group that has at least one imported value, for visibility
+      this._modeValues = modeValues;
+      this._activeMode = null;
+      // open every group that has at least one imported value (base or mode), for visibility
       this._openGroups = new Set(
-        FIELD_GROUPS.filter((g) => g.fields.some((f) => values[f.key])).map((g) => g.id)
+        FIELD_GROUPS.filter((g) =>
+          g.fields.some((f) => values[f.key] || modeValues.light[f.key] || modeValues.dark[f.key])
+        ).map((g) => g.id)
       );
       if (this._openGroups.size === 0) this._openGroups.add(FIELD_GROUPS[0].id);
       this._saveToStorage();
@@ -525,6 +652,27 @@ class ThemeEditorCard extends HTMLElement {
         font-weight: 500; cursor: pointer; font-size: 13px;
       }
       .btn:hover { filter: brightness(1.08); }
+      .btn-clear {
+        border: none; background: transparent; cursor: pointer;
+        color: var(--secondary-text-color, #888); font-size: 12px;
+        padding: 2px 4px; flex-shrink: 0;
+      }
+      .btn-clear:hover { color: var(--error-color, #db4437); }
+      .btn-clear.hidden { visibility: hidden; }
+
+      .mode-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+      .mode-toggle { display: flex; border: 1px solid var(--divider-color, #444); border-radius: 6px; overflow: hidden; }
+      .mode-btn {
+        border: none; background: transparent; color: inherit; cursor: pointer;
+        padding: 6px 12px; font-size: 12px; border-right: 1px solid var(--divider-color, #444);
+      }
+      .mode-btn:last-child { border-right: none; }
+      .mode-btn.active { background: var(--primary-color, #03a9f4); color: white; }
+      .mode-hint {
+        font-size: 12px; color: var(--secondary-text-color, #888);
+        margin-bottom: 10px; padding: 6px 10px; border-radius: 6px;
+        background: rgba(127,127,127,0.08);
+      }
       .btn-flat {
         padding: 8px 12px; border-radius: 6px;
         border: 1px solid var(--divider-color, #444);
@@ -591,7 +739,7 @@ class ThemeEditorCard extends HTMLElement {
       .mockup-side-item.active { color: var(--sidebar-selected-text-color, #03a9f4); }
       .mockup-side-item.active .dot { background: var(--sidebar-selected-icon-color, #03a9f4); }
 
-      .mockup-main { flex: 1; padding: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
+      .mockup-main { flex: 1; padding: 14px; display: flex; gap: var(--grid-gap, 16px); flex-wrap: wrap; }
       .mockup-card {
         background: var(--ha-card-background, #1e1e1e);
         border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, #292929);

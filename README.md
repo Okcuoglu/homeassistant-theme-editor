@@ -32,7 +32,7 @@ started, no restart needed to try ideas.
 
 1. Go to **HACS → Frontend**
 2. Click the three-dot menu → **Custom repositories**
-3. Add `https://github.com/<your-github-username>/homeassistant-theme-editor`
+3. Add `https://github.com/Okcuoglu/homeassistant-theme-editor`
    as category **Dashboard**
 4. Find **Theme Editor Card** in the list and install it
 5. Add the resource if HACS didn't do it automatically (see below)
@@ -40,7 +40,7 @@ started, no restart needed to try ideas.
 ### Manual
 
 1. Download `theme-editor-card.js` from the
-   [latest release](https://github.com/<your-github-username>/homeassistant-theme-editor/releases)
+   [latest release](https://github.com/Okcuoglu/homeassistant-theme-editor/releases)
 2. Copy it into `/config/www/theme-editor-card.js`
 3. Go to **Settings → Dashboards → Resources → Add Resource**
    - URL: `/local/theme-editor-card.js`

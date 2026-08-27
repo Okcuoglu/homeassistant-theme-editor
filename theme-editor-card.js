@@ -3,7 +3,7 @@
  * A full-featured Home Assistant theme editor Lovelace card.
  * Live mockup preview, import/export, category groups, localStorage autosave.
  *
- * https://github.com/<your-github-username>/homeassistant-theme-editor
+ * https://github.com/Okcuoglu/homeassistant-theme-editor
  * License: MIT
  */
 

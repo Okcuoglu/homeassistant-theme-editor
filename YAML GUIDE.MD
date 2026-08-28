@@ -167,6 +167,26 @@ card_mod:
 (swap `azimut` for whichever background id you picked - it's in the
 class names inside the generated YAML).
 
+## Component migration to webawesome (HA 2026.5+)
+
+**Home Assistant migrated `ha-switch`, `ha-checkbox`, and `ha-textarea` to
+a new base component library (webawesome) in the 2026.5 release.** This
+removed the old MDC-based styling tokens for switches:
+`switch-checked-color`, `switch-unchecked-color`,
+`switch-checked-button-color`, `switch-checked-track-color`,
+`switch-unchecked-button-color`, `switch-unchecked-track-color`. If
+you're on HA 2026.5 or later, these six fields (kept in the Switches
+section, labeled "legacy") likely have no visible effect anymore - use
+the `ha-switch-*` fields instead. Checkboxes work the same way: old MDC
+checkbox tokens no longer apply, use the `ha-checkbox-*` fields.
+`ha-progress-bar` is an entirely new, fully-themeable component
+(previously `mwc-progress-bar` wasn't stylable at all) - the
+`ha-progress-bar-*` fields are new capability, not a replacement.
+
+If you're on an older HA version (pre-2026.5), the legacy switch fields
+are what actually works, and the new `ha-switch-*` fields will simply
+have no effect until you update.
+
 ## Troubleshooting
 
 **Input field colors (search boxes, dropdowns, form fields) only partially apply.**

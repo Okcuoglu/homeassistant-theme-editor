@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.2.0";
+const CARD_VERSION = "2.3.0";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -923,6 +923,9 @@ const FIELD_GROUPS = [
       { key: "mdc-shape-medium", label: "Shape medium", type: "text", unit: "px", default: "4px" },
       { key: "mdc-shape-large", label: "Shape large", type: "text", unit: "px", default: "4px" },
       { key: "grid-gap", label: "Grid gap (section spacing)", type: "text", unit: "px", default: "32px" },
+      { key: "ha-box-shadow-s", label: "Box shadow (small, 2026.5+)", type: "text", default: "0 1px 2px rgba(0,0,0,0.3)" },
+      { key: "ha-box-shadow-m", label: "Box shadow (medium, 2026.5+)", type: "text", default: "0 2px 6px rgba(0,0,0,0.35)" },
+      { key: "ha-box-shadow-l", label: "Box shadow (large, 2026.5+)", type: "text", default: "0 8px 24px rgba(0,0,0,0.45)" },
     ],
   },
   {
@@ -954,14 +957,72 @@ const FIELD_GROUPS = [
   {
     id: "switches",
     label: "Switches & Toggles",
-    hint: "Toggle switches in two states, per knob and track.",
+    hint: "Toggle switches, per knob and track. ha-switch was migrated to a new component in HA 2026.5 - the six \"legacy\" fields below may no longer have any effect on current Home Assistant versions; the ha-switch-* fields are the current tokens.",
     fields: [
-      { key: "switch-checked-color", label: "Checked", type: "color", default: "#03a9f4" },
-      { key: "switch-unchecked-color", label: "Unchecked", type: "color", default: "#5c5c5c" },
-      { key: "switch-checked-button-color", label: "Checked button", type: "color", default: "#03a9f4" },
-      { key: "switch-checked-track-color", label: "Checked track", type: "color", default: "#0288d1" },
-      { key: "switch-unchecked-button-color", label: "Unchecked button", type: "color", default: "#bdbdbd" },
-      { key: "switch-unchecked-track-color", label: "Unchecked track", type: "color", default: "#292929" },
+      { key: "switch-checked-color", label: "Checked (legacy)", type: "color", default: "#03a9f4" },
+      { key: "switch-unchecked-color", label: "Unchecked (legacy)", type: "color", default: "#5c5c5c" },
+      { key: "switch-checked-button-color", label: "Checked button (legacy)", type: "color", default: "#03a9f4" },
+      { key: "switch-checked-track-color", label: "Checked track (legacy)", type: "color", default: "#0288d1" },
+      { key: "switch-unchecked-button-color", label: "Unchecked button (legacy)", type: "color", default: "#bdbdbd" },
+      { key: "switch-unchecked-track-color", label: "Unchecked track (legacy)", type: "color", default: "#292929" },
+      { key: "ha-switch-size", label: "Size", type: "text", unit: "px", default: "24px" },
+      { key: "ha-switch-thumb-size", label: "Thumb size", type: "text", unit: "px", default: "16px" },
+      { key: "ha-switch-width", label: "Width", type: "text", unit: "px", default: "40px" },
+      { key: "ha-switch-background-color", label: "Background", type: "color", default: "#5c5c5c" },
+      { key: "ha-switch-thumb-background-color", label: "Thumb background", type: "color", default: "#ffffff" },
+      { key: "ha-switch-background-color-hover", label: "Background (hover)", type: "color", default: "#6c6c6c" },
+      { key: "ha-switch-thumb-background-color-hover", label: "Thumb background (hover)", type: "color", default: "#ffffff" },
+      { key: "ha-switch-checked-background-color", label: "Checked background", type: "color", default: "#03a9f4" },
+      { key: "ha-switch-checked-thumb-background-color", label: "Checked thumb background", type: "color", default: "#ffffff" },
+      { key: "ha-switch-checked-background-color-hover", label: "Checked background (hover)", type: "color", default: "#33bbf6" },
+      { key: "ha-switch-checked-thumb-background-color-hover", label: "Checked thumb background (hover)", type: "color", default: "#ffffff" },
+      { key: "ha-switch-border-color", label: "Border", type: "color", default: "#5c5c5c" },
+      { key: "ha-switch-thumb-border-color", label: "Thumb border", type: "color", default: "#5c5c5c" },
+      { key: "ha-switch-thumb-border-color-hover", label: "Thumb border (hover)", type: "color", default: "#6c6c6c" },
+      { key: "ha-switch-checked-border-color", label: "Checked border", type: "color", default: "#03a9f4" },
+      { key: "ha-switch-checked-thumb-border-color", label: "Checked thumb border", type: "color", default: "#03a9f4" },
+      { key: "ha-switch-checked-border-color-hover", label: "Checked border (hover)", type: "color", default: "#33bbf6" },
+      { key: "ha-switch-checked-thumb-border-color-hover", label: "Checked thumb border (hover)", type: "color", default: "#33bbf6" },
+      { key: "ha-switch-thumb-box-shadow", label: "Thumb box shadow", type: "text", default: "0 1px 3px rgba(0,0,0,0.3)" },
+      { key: "ha-switch-disabled-opacity", label: "Disabled opacity", type: "text", default: "0.5" },
+      { key: "ha-switch-required-marker", label: "Required marker", type: "text", default: "*" },
+      { key: "ha-switch-required-marker-offset", label: "Required marker offset", type: "text", unit: "px", default: "2px" },
+    ],
+  },
+  {
+    id: "checkboxes",
+    label: "Checkboxes",
+    hint: "ha-checkbox was migrated to a new component in HA 2026.5 (webawesome-based) - old MDC checkbox tokens no longer apply, these are the current ones.",
+    fields: [
+      { key: "ha-checkbox-size", label: "Size", type: "text", unit: "px", default: "18px" },
+      { key: "ha-checkbox-border-color", label: "Border", type: "color", default: "#5c5c5c" },
+      { key: "ha-checkbox-border-color-hover", label: "Border (hover)", type: "color", default: "#03a9f4" },
+      { key: "ha-checkbox-background-color", label: "Background", type: "color", default: "#1e1e1e" },
+      { key: "ha-checkbox-background-color-hover", label: "Background (hover)", type: "color", default: "#2a2a2a" },
+      { key: "ha-checkbox-checked-background-color", label: "Checked background", type: "color", default: "#03a9f4" },
+      { key: "ha-checkbox-checked-background-color-hover", label: "Checked background (hover)", type: "color", default: "#33bbf6" },
+      { key: "ha-checkbox-checked-icon-color", label: "Checked icon", type: "color", default: "#ffffff" },
+      { key: "ha-checkbox-checked-icon-scale", label: "Checked icon scale", type: "text", default: "1" },
+      { key: "ha-checkbox-border-radius", label: "Border radius", type: "text", unit: "px", default: "4px" },
+      { key: "ha-checkbox-border-width", label: "Border width", type: "text", unit: "px", default: "2px" },
+      { key: "ha-checkbox-required-marker", label: "Required marker", type: "text", default: "*" },
+      { key: "ha-checkbox-required-marker-offset", label: "Required marker offset", type: "text", unit: "px", default: "2px" },
+    ],
+  },
+  {
+    id: "progress",
+    label: "Progress Bar",
+    hint: "ha-progress-bar replaced mwc-progress-bar in HA 2026.5 and is fully themeable via these tokens.",
+    fields: [
+      { key: "ha-progress-bar-indicator-color", label: "Indicator", type: "color", default: "#03a9f4" },
+      { key: "ha-progress-bar-indicator-background", label: "Indicator background", type: "color", default: "#03a9f4" },
+      { key: "ha-progress-bar-track-color", label: "Track", type: "color", default: "#292929" },
+      { key: "ha-progress-bar-track-height", label: "Track height", type: "text", unit: "px", default: "4px" },
+      { key: "ha-progress-bar-border-radius", label: "Border radius", type: "text", unit: "px", default: "2px" },
+      { key: "ha-progress-bar-animation-duration", label: "Animation duration", type: "text", default: "1s" },
+      { key: "ha-progress-bar-indicator-highlight-image", label: "Indicator highlight image", type: "text", default: "none" },
+      { key: "ha-progress-bar-indicator-highlight-width", label: "Indicator highlight width", type: "text", unit: "px", default: "0px" },
+      { key: "ha-progress-bar-indicator-highlight-height", label: "Indicator highlight height", type: "text", unit: "px", default: "0px" },
     ],
   },
   {
@@ -979,18 +1040,24 @@ const FIELD_GROUPS = [
   {
     id: "material",
     label: "Dialogs / Material Surfaces",
-    hint: "Material surfaces in dialogs and menus.",
+    hint: "Material surfaces in dialogs and menus. The ha-color-surface-* set is forward-looking (introduced in HA 2026.5, currently only affects ha-tooltip per HA's own release notes - expect it to apply more broadly in future versions).",
     fields: [
       { key: "mdc-theme-surface", label: "Surface", type: "color", default: "#1e1e1e" },
       { key: "material-body-text-color", label: "Body text", type: "color", default: "#ffffff" },
       { key: "material-background-color", label: "Background", type: "color", default: "#111111" },
       { key: "material-secondary-background-color", label: "Secondary background", type: "color", default: "#1c1c1c" },
+      { key: "ha-color-surface-default", label: "Surface default (2026.5+)", type: "color", default: "#1e1e1e" },
+      { key: "ha-color-surface-low", label: "Surface low (2026.5+)", type: "color", default: "#181818" },
+      { key: "ha-color-surface-lower", label: "Surface lower (2026.5+)", type: "color", default: "#111111" },
+      { key: "ha-color-surface-default-inverted", label: "Surface default, inverted (2026.5+)", type: "color", default: "#ffffff" },
+      { key: "ha-color-surface-low-inverted", label: "Surface low, inverted (2026.5+)", type: "color", default: "#f2f2f2" },
+      { key: "ha-color-surface-lower-inverted", label: "Surface lower, inverted (2026.5+)", type: "color", default: "#e5e5e5" },
     ],
   },
   {
     id: "inputs",
     label: "Input Fields",
-    hint: "Backgrounds and text of text fields, dropdowns, and search boxes across ALL of Home Assistant (not just cards) - e.g. the automation editor, entity search, HACS dialogs. These variable names have shifted across recent HA versions (Material Design 3 migration in 2026.4 introduced the md-sys-color-* set below alongside the older mdc-/input- set) - if one set doesn't visibly apply on your HA version, the other one is the fallback to try.",
+    hint: "Backgrounds and text of text fields, dropdowns, and search boxes across ALL of Home Assistant (not just cards) - e.g. the automation editor, entity search, HACS dialogs. These variable names have shifted across recent HA versions (Material Design 3 migration in 2026.4 introduced the md-sys-color-* set, and ha-color-form-background is a further newer token) - if one set doesn't visibly apply on your HA version, try the others.",
     fields: [
       { key: "input-fill-color", label: "Fill (legacy)", type: "color", default: "#1e1e1e" },
       { key: "input-ink-color", label: "Text (legacy)", type: "color", default: "#ffffff" },
@@ -1004,6 +1071,7 @@ const FIELD_GROUPS = [
       { key: "md-sys-color-surface-container", label: "MD3 surface container", type: "color", default: "#1e1e1e" },
       { key: "md-sys-color-on-surface", label: "MD3 text on surface", type: "color", default: "#ffffff" },
       { key: "md-sys-color-on-surface-variant", label: "MD3 text on surface (muted)", type: "color", default: "#a3a3a3" },
+      { key: "ha-color-form-background", label: "Form field background", type: "color", default: "#1e1e1e" },
     ],
   },
   {

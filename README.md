@@ -30,10 +30,11 @@ column of accordions:
 
 ## Features
 
-- 🎨 **73 fixed theme variables** across 12 sections (primary colors,
+- 🎨 **127 fixed theme variables** across 14 sections (primary colors,
   backgrounds, text, sidebar, cards & shape, typography, status colors,
-  switches, slider & lines, dialogs, input fields, label badges), plus
-  unlimited **custom variables** for anything else (see below)
+  switches, checkboxes, progress bar, slider & lines, dialogs, input
+  fields, label badges), plus unlimited **custom variables** for anything
+  else (see below)
 - 🌗 **Light/Dark mode editing** - edit shared base values once, then switch
   to Light or Dark to add mode-specific overrides, with a one-click "copy
   from other mode" starting point
@@ -72,12 +73,17 @@ column of accordions:
 - ⌨️ **Input Fields section** - backgrounds/text/underlines for text fields,
   dropdowns, and search boxes across *all* of Home Assistant, not just
   cards (the automation editor, entity search, other integrations'
-  dialogs). Covers both the legacy `input-*`/`mdc-*` variable set and the
-  newer `md-sys-color-*` set HA introduced with its Material Design 3
-  migration - these are more version-dependent than most other variables,
-  see [YAML-GUIDE.md](YAML-GUIDE.md) if one set doesn't visibly apply
+  dialogs). Covers the legacy `input-*`/`mdc-*` set, the `md-sys-color-*`
+  MD3 set, and the newer `ha-color-form-background` token - these are more
+  version-dependent than most other variables, see
+  [YAML-GUIDE.md](YAML-GUIDE.md) if one set doesn't visibly apply
+- 🔘 **Switches, Checkboxes & Progress Bar sections** - HA 2026.5 migrated
+  these components to a new base (webawesome) with entirely new token
+  families (`ha-switch-*`, `ha-checkbox-*`, `ha-progress-bar-*`). The old
+  `switch-*` tokens are kept and labeled "(legacy)" since they may no
+  longer have any effect on current Home Assistant - use the new ones
 - 🧩 **Custom Variables section** - an escape hatch for anything not
-  covered by the 73 built-in fields, most notably Home Assistant's
+  covered by the 127 built-in fields, most notably Home Assistant's
   per-entity **state colors** (`state-{domain}-{device_class}-{state}-color`,
   e.g. `state-cover-garage-open-color`) - a huge, open-ended combination
   of 27 domains × arbitrary states/device classes that can't reasonably be

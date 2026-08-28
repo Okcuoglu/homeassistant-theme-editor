@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.2.0";
+const CARD_VERSION = "1.3.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -314,6 +314,48 @@ function buildYaml(themeName, values, modeValues) {
   return lines.join("\n") + "\n";
 }
 
+// Builds a card-mod theme snippet: a global default card style plus
+// opt-in per-card variant classes (ha-card.elevated / .flat / .outlined /
+// .glass-holo). All colors reference theme CSS vars, so it adapts to
+// whichever theme/preset is currently loaded instead of hardcoding hex values.
+// Requires the separate "card-mod" HACS integration to actually take effect.
+function buildCardModSnippet(themeName, opts) {
+  const ms = opts.transitionMs || 200;
+  const variantCss = {
+    elevated: `box-shadow: 0 4px 14px rgba(0,0,0,0.35);\n      border: none;`,
+    flat: `box-shadow: none;\n      border: none;`,
+    outlined: `box-shadow: none;\n      border: 1px solid var(--divider-color);`,
+    glass: `background: color-mix(in srgb, var(--card-background-color) 55%, transparent);\n      backdrop-filter: blur(12px) saturate(140%);\n      border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent);\n      box-shadow: 0 0 24px color-mix(in srgb, var(--primary-color) 25%, transparent);\n      animation: theme-editor-holo-pulse 3s ease-in-out infinite;`,
+  };
+
+  const globalVariantBlock = opts.variant && opts.variant !== "none" ? `\n      ${variantCss[opts.variant].split("\n").join("\n      ")}` : "";
+
+  const lines = [];
+  lines.push(`  card-mod-theme: "${themeName}"`);
+  lines.push(`  card-mod-card: |`);
+  lines.push(`    @keyframes theme-editor-holo-pulse {`);
+  lines.push(`      0%, 100% { box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 20%, transparent); }`);
+  lines.push(`      50% { box-shadow: 0 0 30px color-mix(in srgb, var(--primary-color) 45%, transparent); }`);
+  lines.push(`    }`);
+  lines.push(`    ha-card {`);
+  lines.push(`      transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;${globalVariantBlock}`);
+  lines.push(`    }`);
+  if (opts.hoverElevate) {
+    lines.push(`    ha-card:hover {`);
+    lines.push(`      transform: translateY(-3px);`);
+    lines.push(`      box-shadow: 0 10px 24px rgba(0,0,0,0.4);`);
+    lines.push(`    }`);
+  }
+  lines.push(`    /* Per-card overrides: add card_mod: { class: elevated|flat|outlined|glass-holo }`);
+  lines.push(`       to an individual card's config to opt just that card into a different look. */`);
+  lines.push(`    ha-card.elevated { ${variantCss.elevated.split("\n").join(" ")} }`);
+  lines.push(`    ha-card.flat { ${variantCss.flat.split("\n").join(" ")} }`);
+  lines.push(`    ha-card.outlined { ${variantCss.outlined.split("\n").join(" ")} }`);
+  lines.push(`    ha-card.glass-holo { ${variantCss.glass.split("\n").join(" ")} }`);
+  return lines.join("\n") + "\n";
+}
+
+
 // Parses a HA theme block, including an optional `modes: light: / dark:`
 // section. Deliberately simple - assumes consistent 2-space indentation,
 // which is what this card (and most hand-written themes) produce.
@@ -383,6 +425,7 @@ class ThemeEditorCard extends HTMLElement {
     this._modeValues = { light: {}, dark: {} };
     this._activeMode = null; // null = base (both modes), or "light" / "dark"
     this._previewDevice = "desktop"; // "desktop" | "mobile"
+    this._advanced = { hoverElevate: true, variant: "elevated", transitionMs: 200 };
     this._themeName = "my_custom_theme";
     this._openGroups = new Set([FIELD_GROUPS[0].id]);
   }
@@ -417,6 +460,7 @@ class ThemeEditorCard extends HTMLElement {
         this._modeValues = parsed.modeValues || { light: {}, dark: {} };
         this._themeName = parsed.themeName || "my_custom_theme";
         this._previewDevice = parsed.previewDevice || "desktop";
+        this._advanced = parsed.advanced || { hoverElevate: true, variant: "elevated", transitionMs: 200 };
       }
     } catch (e) {
       // ignore corrupt storage
@@ -432,6 +476,7 @@ class ThemeEditorCard extends HTMLElement {
           modeValues: this._modeValues,
           themeName: this._themeName,
           previewDevice: this._previewDevice,
+          advanced: this._advanced,
         })
       );
     } catch (e) {
@@ -453,6 +498,7 @@ class ThemeEditorCard extends HTMLElement {
           </div>
           <div class="header-actions">
             <button class="btn-flat" id="btn-presets">Presets</button>
+            <button class="btn-flat" id="btn-advanced">Advanced</button>
             <button class="btn-flat" id="btn-import">Import</button>
             <button class="btn-flat" id="btn-reset">Reset</button>
           </div>
@@ -686,6 +732,7 @@ class ThemeEditorCard extends HTMLElement {
 
     root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
     root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
+    root.getElementById("btn-advanced").addEventListener("click", () => this._openAdvancedDialog());
 
     root.getElementById("btn-copy").addEventListener("click", async () => {
       const yaml = buildYaml(this._themeName, this._values, this._modeValues);
@@ -716,6 +763,102 @@ class ThemeEditorCard extends HTMLElement {
     setTimeout(() => {
       if (el.textContent === msg) el.textContent = "";
     }, 3000);
+  }
+
+  _openAdvancedDialog() {
+    const existing = this.shadowRoot.getElementById("advanced-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "advanced-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="dialog dialog-wide">
+        <div class="dialog-title">Advanced (card-mod)</div>
+        <div class="dialog-sub">
+          Theme variables alone can't do animations or per-card variety - that needs
+          <strong>card-mod</strong> (a separate, very popular HACS integration). This generates
+          a ready-to-paste snippet: a global default look for every card, plus opt-in classes
+          for individual cards. Colors reference your theme variables, so it adapts to whatever
+          you've set above.
+        </div>
+
+        <div class="adv-controls">
+          <label class="adv-row">
+            <input type="checkbox" id="adv-hover" ${this._advanced.hoverElevate ? "checked" : ""} />
+            Hover-elevate animation (card lifts slightly on mouseover)
+          </label>
+
+          <label class="adv-row">
+            <span>Global default card variant</span>
+            <select id="adv-variant">
+              <option value="none" ${this._advanced.variant === "none" ? "selected" : ""}>None (plain)</option>
+              <option value="elevated" ${this._advanced.variant === "elevated" ? "selected" : ""}>Elevated (shadow)</option>
+              <option value="flat" ${this._advanced.variant === "flat" ? "selected" : ""}>Flat (no border/shadow)</option>
+              <option value="outlined" ${this._advanced.variant === "outlined" ? "selected" : ""}>Outlined (border only)</option>
+              <option value="glass" ${this._advanced.variant === "glass" ? "selected" : ""}>Glass / Holo (blur + glow pulse)</option>
+            </select>
+          </label>
+
+          <label class="adv-row">
+            <span>Transition speed: <strong id="adv-ms-label">${this._advanced.transitionMs}ms</strong></span>
+            <input type="range" id="adv-ms" min="50" max="600" step="10" value="${this._advanced.transitionMs}" />
+          </label>
+        </div>
+
+        <div class="adv-yaml-label">Paste this into your theme file (merges alongside the fields above):</div>
+        <textarea id="adv-yaml-out" rows="12" readonly></textarea>
+
+        <div class="dialog-sub">
+          To use a variant on just one card instead of the global default, add to that card's
+          config:
+          <code>card_mod:\u000A&nbsp;&nbsp;class: flat</code> (or <code>elevated</code> / <code>outlined</code> / <code>glass-holo</code>).
+        </div>
+
+        <div class="dialog-actions">
+          <button class="btn-flat" id="adv-close">Close</button>
+          <button class="btn" id="adv-copy">Copy YAML</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    const refreshYaml = () => {
+      const out = overlay.querySelector("#adv-yaml-out");
+      out.value = buildCardModSnippet(this._themeName, this._advanced);
+    };
+    refreshYaml();
+
+    overlay.querySelector("#adv-hover").addEventListener("change", (e) => {
+      this._advanced.hoverElevate = e.target.checked;
+      this._saveToStorage();
+      refreshYaml();
+    });
+    overlay.querySelector("#adv-variant").addEventListener("change", (e) => {
+      this._advanced.variant = e.target.value;
+      this._saveToStorage();
+      refreshYaml();
+    });
+    overlay.querySelector("#adv-ms").addEventListener("input", (e) => {
+      this._advanced.transitionMs = parseInt(e.target.value, 10);
+      overlay.querySelector("#adv-ms-label").textContent = `${this._advanced.transitionMs}ms`;
+      this._saveToStorage();
+      refreshYaml();
+    });
+    overlay.querySelector("#adv-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#adv-copy").addEventListener("click", async () => {
+      const yaml = overlay.querySelector("#adv-yaml-out").value;
+      try {
+        await navigator.clipboard.writeText(yaml);
+        overlay.querySelector("#adv-copy").textContent = "Copied!";
+        setTimeout(() => {
+          const btn = overlay.querySelector("#adv-copy");
+          if (btn) btn.textContent = "Copy YAML";
+        }, 2000);
+      } catch (e) {
+        // clipboard API unavailable - user can select the textarea manually
+      }
+    });
   }
 
   _openPresetsDialog() {
@@ -999,6 +1142,7 @@ class ThemeEditorCard extends HTMLElement {
         padding: 18px; border-radius: 10px; width: min(480px, 90vw);
         display: flex; flex-direction: column; gap: 10px;
       }
+      .dialog-wide { width: min(560px, 92vw); }
       .dialog-title { font-size: 16px; font-weight: 600; }
       .dialog-sub { font-size: 12px; color: var(--secondary-text-color, #888); }
       .dialog textarea {
@@ -1024,6 +1168,26 @@ class ThemeEditorCard extends HTMLElement {
       .preset-info { flex: 1; min-width: 0; }
       .preset-name { font-size: 13px; font-weight: 600; }
       .preset-desc { font-size: 11px; color: var(--secondary-text-color, #888); }
+
+      .adv-controls { display: flex; flex-direction: column; gap: 12px; }
+      .adv-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+      .adv-row:has(input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 8px; }
+      .adv-row select, .adv-row input[type="range"] { width: 100%; }
+      .adv-row select {
+        padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color, #444);
+        background: var(--primary-background-color, #111); color: inherit;
+      }
+      .adv-yaml-label { font-size: 12px; color: var(--secondary-text-color, #888); margin-top: 4px; }
+      #adv-yaml-out {
+        width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px;
+        background: var(--primary-background-color, #111); color: inherit;
+        border: 1px solid var(--divider-color, #444); border-radius: 6px; padding: 8px;
+        resize: vertical;
+      }
+      .dialog-sub code {
+        background: rgba(127,127,127,0.15); padding: 1px 5px; border-radius: 4px;
+        font-family: monospace; font-size: 11px; white-space: pre;
+      }
     `;
   }
 }

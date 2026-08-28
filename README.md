@@ -40,7 +40,9 @@ column of accordions:
   from other mode" starting point
 - 👀 **Live preview** in a device frame (Phone 300px / Tablet 380px /
   Wall Panel 400px) that updates instantly as you edit, without touching
-  your real dashboard
+  your real dashboard, with a **Primary Colors strip** underneath -
+  always-visible swatches for your 4 lead colors, click any one to copy
+  its hex, no need to switch sections to grab a value
 - 📚 **15 built-in starter presets** across a wide range of moods - from
   clean minimalism to warm materials to retro-technical - to load as a
   jumping-off point

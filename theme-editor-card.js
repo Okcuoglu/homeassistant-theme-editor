@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.3.0";
+const CARD_VERSION = "2.4.0";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -2367,9 +2367,34 @@ class ThemeEditorCard extends HTMLElement {
             ${this._previewFrameInnerHtml()}
           </div>
         </div>
+        ${this._primaryColorsStripHtml()}
         <div class="te-preview-foot">
           <button class="te-btn" id="btn-full-preview">Fullscreen</button>
           <button class="te-btn" id="btn-compare-shapes">Compare shapes</button>
+        </div>
+      </div>
+    `;
+  }
+
+  _primaryColorsStripHtml() {
+    const primaryGroup = FIELD_GROUPS.find((g) => g.id === "primary");
+    const vars = this._computeEffectiveVars();
+    return `
+      <div class="te-primary-strip">
+        <span class="te-primary-strip-label">Primary Colors</span>
+        <div class="te-primary-swatches">
+          ${primaryGroup.fields
+            .map((f) => {
+              const val = vars[f.key] || f.default;
+              return `
+              <button class="te-primary-swatch-btn" data-copy-color="${val}" title="Copy ${val}">
+                <span class="te-primary-swatch" style="background:${val}"></span>
+                <span class="te-primary-swatch-name">${f.label}</span>
+                <span class="te-primary-swatch-hex">${val}</span>
+              </button>
+            `;
+            })
+            .join("")}
         </div>
       </div>
     `;
@@ -2691,6 +2716,18 @@ class ThemeEditorCard extends HTMLElement {
     const compareShapesBtn = root.getElementById("btn-compare-shapes");
     if (compareShapesBtn) compareShapesBtn.addEventListener("click", () => this._openVariantGalleryDialog());
 
+    root.querySelectorAll("[data-copy-color]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const ok = await this._copyToClipboard(btn.dataset.copyColor);
+        const hexEl = btn.querySelector(".te-primary-swatch-hex");
+        const original = hexEl.textContent;
+        hexEl.textContent = ok ? "Copied!" : "Copy failed";
+        setTimeout(() => {
+          hexEl.textContent = original;
+        }, 1200);
+      });
+    });
+
     // <1024px: preview becomes a collapsible panel, toggled by a button CSS
     // only shows at that width (see _css() .te-preview-toggle media rule)
     const previewToggle = root.getElementById("te-preview-toggle");
@@ -2807,33 +2844,35 @@ class ThemeEditorCard extends HTMLElement {
     overlay.className = "te-overlay";
     overlay.innerHTML = `
       <div class="te-dialog te-dialog-wide">
-        <div class="te-dialog-title-row">
-          <div class="te-dialog-title">Compare Shapes</div>
-          <button class="te-btn te-btn-icon" id="vg-close">✕</button>
-        </div>
-        <div class="te-dialog-sub">
-          All ${Object.keys(CARD_VARIANT_LABELS).length - 1} card shapes side by side, with your
-          current animations and colors applied. Click a card's name to copy its
-          <code>card_mod: class: ...</code> value.
-        </div>
-        <div class="te-gallery-grid">
-          ${Object.entries(CARD_VARIANT_LABELS)
-            .filter(([key]) => key !== "none")
-            .map(([key, label]) => {
-              const className = key === "glass" ? "glass-holo" : key;
-              return `
-              <div class="mockup-card vg-card" style="${CARD_VARIANT_DECLS[key]}">
-                <div class="pf-title">${label}</div>
-                <div class="pf-row" style="margin-top: 8px;">
-                  <span class="pf-sub">On/Off</span>
-                  <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
+        <div class="te-dialog-scroll">
+          <div class="te-dialog-title-row">
+            <div class="te-dialog-title">Compare Shapes</div>
+            <button class="te-btn te-btn-icon" id="vg-close">✕</button>
+          </div>
+          <div class="te-dialog-sub">
+            All ${Object.keys(CARD_VARIANT_LABELS).length - 1} card shapes side by side, with your
+            current animations and colors applied. Click a card's name to copy its
+            <code>card_mod: class: ...</code> value.
+          </div>
+          <div class="te-gallery-grid">
+            ${Object.entries(CARD_VARIANT_LABELS)
+              .filter(([key]) => key !== "none")
+              .map(([key, label]) => {
+                const className = key === "glass" ? "glass-holo" : key;
+                return `
+                <div class="mockup-card vg-card" style="${CARD_VARIANT_DECLS[key]}">
+                  <div class="pf-title">${label}</div>
+                  <div class="pf-row" style="margin-top: 8px;">
+                    <span class="pf-sub">On/Off</span>
+                    <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
+                  </div>
+                  <div class="mockup-slider" style="margin-top: 8px;"><span class="mockup-slider-fill" style="width:60%"></span></div>
+                  <button class="te-vg-copy" data-class="${className}">card_mod: class: ${className}</button>
                 </div>
-                <div class="mockup-slider" style="margin-top: 8px;"><span class="mockup-slider-fill" style="width:60%"></span></div>
-                <button class="te-vg-copy" data-class="${className}">card_mod: class: ${className}</button>
-              </div>
-            `;
-            })
-            .join("")}
+              `;
+              })
+              .join("")}
+          </div>
         </div>
       </div>
     `;
@@ -2869,20 +2908,22 @@ class ThemeEditorCard extends HTMLElement {
     overlay.className = "te-overlay";
     overlay.innerHTML = `
       <div class="te-dialog te-dialog-wide">
-        <div class="te-dialog-title-row">
-          <div class="te-dialog-title">Full Preview</div>
-          <div class="te-dialog-title-actions">
-            <button class="te-btn te-btn-small" id="fp-refresh">↻ Refresh</button>
-            <button class="te-btn te-btn-icon" id="fp-close">✕</button>
+        <div class="te-dialog-scroll">
+          <div class="te-dialog-title-row">
+            <div class="te-dialog-title">Full Preview</div>
+            <div class="te-dialog-title-actions">
+              <button class="te-btn te-btn-small" id="fp-refresh">↻ Refresh</button>
+              <button class="te-btn te-btn-icon" id="fp-close">✕</button>
+            </div>
           </div>
-        </div>
-        <div class="te-dialog-sub">
-          A snapshot of common Home Assistant card types with your current theme applied.
-          Not every possible card exists here, but this covers the most common ones. Hit
-          Refresh after editing fields elsewhere to re-sync this snapshot.
-        </div>
-        <div class="te-gallery-grid" id="fp-grid">
-          ${this._fullPreviewCardsHtml()}
+          <div class="te-dialog-sub">
+            A snapshot of common Home Assistant card types with your current theme applied.
+            Not every possible card exists here, but this covers the most common ones. Hit
+            Refresh after editing fields elsewhere to re-sync this snapshot.
+          </div>
+          <div class="te-gallery-grid" id="fp-grid">
+            ${this._fullPreviewCardsHtml()}
+          </div>
         </div>
       </div>
     `;
@@ -3221,6 +3262,31 @@ class ThemeEditorCard extends HTMLElement {
         transform: translateZ(0); position: relative; /* fixed-position background containment */
       }
       .te-preview-foot { padding: 10px 14px; border-top: 1px solid #1e2c34; display: flex; gap: 8px; flex-shrink: 0; }
+
+      .te-primary-strip {
+        padding: 10px 14px; border-top: 1px solid #1e2c34; flex-shrink: 0;
+      }
+      .te-primary-strip-label {
+        font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--te-text-3);
+        display: block; margin-bottom: 8px;
+      }
+      .te-primary-swatches { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+      .te-primary-swatch-btn {
+        display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px;
+        background: var(--te-surface); border: 1px solid var(--te-border); cursor: pointer; text-align: left;
+        min-width: 0;
+      }
+      .te-primary-swatch-btn:hover { border-color: var(--te-accent); }
+      .te-primary-swatch {
+        width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; border: 1px solid rgba(255,255,255,.16);
+      }
+      .te-primary-swatch-name {
+        font-size: 10.5px; color: var(--te-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+      }
+      .te-primary-swatch-hex {
+        font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--te-text-3);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; max-width: 62px;
+      }
       .te-preview-foot .te-btn { flex: 1; }
 
       .pf-header {
@@ -3286,7 +3352,17 @@ class ThemeEditorCard extends HTMLElement {
         width: min(480px, 90vw); display: flex; flex-direction: column; gap: 10px;
         border: 1px solid var(--te-border-str);
       }
-      .te-dialog-wide { width: min(960px, 96vw); max-height: 88vh; overflow-y: auto; transform: translateZ(0); position: relative; }
+      .te-dialog-wide {
+        width: min(960px, 96vw); max-height: 88vh;
+        display: flex; flex-direction: column;
+        padding: 0; /* moved to .te-dialog-scroll so the background layer can be clipped edge-to-edge */
+        overflow: hidden; /* clip the background layer entirely - see .te-dialog-scroll for the actual scroll region */
+        transform: translateZ(0); position: relative;
+      }
+      .te-dialog-scroll {
+        overflow-y: auto; overflow-x: hidden; min-height: 0;
+        display: flex; flex-direction: column; gap: 10px; padding: 18px;
+      }
       .te-dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
       .te-dialog-title { font-size: 16px; font-weight: 600; }
       .te-dialog-title-actions { display: flex; gap: 8px; }

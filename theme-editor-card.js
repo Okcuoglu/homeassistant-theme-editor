@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.6.0";
+const CARD_VERSION = "1.6.1";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -1407,8 +1407,17 @@ class ThemeEditorCard extends HTMLElement {
     if (!wrap) return;
     const modeOverrides = this._activeMode ? this._modeValues[this._activeMode] : {};
     for (const field of ALL_FIELDS) {
-      const val = modeOverrides[field.key] || this._values[field.key] || field.default;
-      wrap.style.setProperty(`--${field.key}`, val);
+      const val = modeOverrides[field.key] || this._values[field.key];
+      // Only set the CSS var when the theme actually defines a value - same as real
+      // Home Assistant, which only injects variables a theme specifies. If we always
+      // forced field.default here, dependent vars like --ha-card-background would never
+      // be "unset", so their CSS var(x, var(--card-background-color, ...)) fallback
+      // chains could never kick in even when the theme only sets card-background-color.
+      if (val) {
+        wrap.style.setProperty(`--${field.key}`, val);
+      } else {
+        wrap.style.removeProperty(`--${field.key}`);
+      }
     }
   }
 
@@ -1885,8 +1894,8 @@ class ThemeEditorCard extends HTMLElement {
 
       .mockup-main { flex: 1; padding: 14px; display: flex; gap: var(--grid-gap, 16px); flex-wrap: wrap; }
       .mockup-card {
-        background: var(--ha-card-background, #1e1e1e);
-        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, #292929);
+        background: var(--ha-card-background, var(--card-background-color, #1e1e1e));
+        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, #292929));
         border-radius: var(--ha-card-border-radius, 12px);
         padding: 12px; min-width: 160px; flex: 1;
         color: var(--primary-text-color, #fff);

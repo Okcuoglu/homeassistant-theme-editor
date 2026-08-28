@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.3.0";
+const CARD_VERSION = "1.4.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -319,24 +319,31 @@ function buildYaml(themeName, values, modeValues) {
 // .glass-holo). All colors reference theme CSS vars, so it adapts to
 // whichever theme/preset is currently loaded instead of hardcoding hex values.
 // Requires the separate "card-mod" HACS integration to actually take effect.
+// Shared CSS declarations per card variant - used both for the copyable
+// card-mod YAML snippet (targeting real `ha-card`) and for the live mockup
+// preview (targeting `.mockup-card`), so the preview never drifts from what
+// actually gets exported.
+const CARD_VARIANT_DECLS = {
+  elevated: "box-shadow: 0 4px 14px rgba(0,0,0,0.35); border: none;",
+  flat: "box-shadow: none; border: none;",
+  outlined: "box-shadow: none; border: 1px solid var(--divider-color);",
+  glass:
+    "background: color-mix(in srgb, var(--card-background-color) 55%, transparent); backdrop-filter: blur(12px) saturate(140%); border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent); box-shadow: 0 0 24px color-mix(in srgb, var(--primary-color) 25%, transparent); animation: theme-editor-holo-pulse 3s ease-in-out infinite;",
+};
+
+const HOLO_PULSE_KEYFRAMES = `@keyframes theme-editor-holo-pulse {
+      0%, 100% { box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 20%, transparent); }
+      50% { box-shadow: 0 0 30px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+    }`;
+
 function buildCardModSnippet(themeName, opts) {
   const ms = opts.transitionMs || 200;
-  const variantCss = {
-    elevated: `box-shadow: 0 4px 14px rgba(0,0,0,0.35);\n      border: none;`,
-    flat: `box-shadow: none;\n      border: none;`,
-    outlined: `box-shadow: none;\n      border: 1px solid var(--divider-color);`,
-    glass: `background: color-mix(in srgb, var(--card-background-color) 55%, transparent);\n      backdrop-filter: blur(12px) saturate(140%);\n      border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent);\n      box-shadow: 0 0 24px color-mix(in srgb, var(--primary-color) 25%, transparent);\n      animation: theme-editor-holo-pulse 3s ease-in-out infinite;`,
-  };
-
-  const globalVariantBlock = opts.variant && opts.variant !== "none" ? `\n      ${variantCss[opts.variant].split("\n").join("\n      ")}` : "";
+  const globalVariantBlock = opts.variant && opts.variant !== "none" ? `\n      ${CARD_VARIANT_DECLS[opts.variant]}` : "";
 
   const lines = [];
   lines.push(`  card-mod-theme: "${themeName}"`);
   lines.push(`  card-mod-card: |`);
-  lines.push(`    @keyframes theme-editor-holo-pulse {`);
-  lines.push(`      0%, 100% { box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 20%, transparent); }`);
-  lines.push(`      50% { box-shadow: 0 0 30px color-mix(in srgb, var(--primary-color) 45%, transparent); }`);
-  lines.push(`    }`);
+  lines.push(`    ${HOLO_PULSE_KEYFRAMES}`);
   lines.push(`    ha-card {`);
   lines.push(`      transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;${globalVariantBlock}`);
   lines.push(`    }`);
@@ -348,11 +355,34 @@ function buildCardModSnippet(themeName, opts) {
   }
   lines.push(`    /* Per-card overrides: add card_mod: { class: elevated|flat|outlined|glass-holo }`);
   lines.push(`       to an individual card's config to opt just that card into a different look. */`);
-  lines.push(`    ha-card.elevated { ${variantCss.elevated.split("\n").join(" ")} }`);
-  lines.push(`    ha-card.flat { ${variantCss.flat.split("\n").join(" ")} }`);
-  lines.push(`    ha-card.outlined { ${variantCss.outlined.split("\n").join(" ")} }`);
-  lines.push(`    ha-card.glass-holo { ${variantCss.glass.split("\n").join(" ")} }`);
+  lines.push(`    ha-card.elevated { ${CARD_VARIANT_DECLS.elevated} }`);
+  lines.push(`    ha-card.flat { ${CARD_VARIANT_DECLS.flat} }`);
+  lines.push(`    ha-card.outlined { ${CARD_VARIANT_DECLS.outlined} }`);
+  lines.push(`    ha-card.glass-holo { ${CARD_VARIANT_DECLS.glass} }`);
   return lines.join("\n") + "\n";
+}
+
+// Builds plain CSS (not YAML) for the live mockup preview, targeting
+// .mockup-card instead of ha-card, using the exact same variant/hover/
+// transition logic as buildCardModSnippet.
+function buildPreviewAdvancedCss(advanced) {
+  const ms = advanced.transitionMs || 200;
+  const variantDecl = advanced.variant && advanced.variant !== "none" ? CARD_VARIANT_DECLS[advanced.variant] : "";
+  let css = `
+    ${HOLO_PULSE_KEYFRAMES}
+    .mockup-card {
+      transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;
+      ${variantDecl}
+    }
+  `;
+  if (advanced.hoverElevate) {
+    css += `
+    .mockup-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+    }`;
+  }
+  return css;
 }
 
 
@@ -550,6 +580,7 @@ class ThemeEditorCard extends HTMLElement {
       </ha-card>
     `;
     this._applyPreviewVars();
+    this._applyAdvancedPreview();
     this._bindEvents();
   }
 
@@ -648,6 +679,20 @@ class ThemeEditorCard extends HTMLElement {
     }
   }
 
+  // Injects a <style> tag into the preview so card-mod's hover/variant/
+  // transition settings are visible live, without touching the real dashboard.
+  _applyAdvancedPreview() {
+    const wrap = this.shadowRoot.getElementById("preview-wrap");
+    if (!wrap) return;
+    let styleEl = wrap.querySelector("#adv-preview-style");
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "adv-preview-style";
+      wrap.appendChild(styleEl);
+    }
+    styleEl.textContent = buildPreviewAdvancedCss(this._advanced);
+  }
+
   /* ---------------- events ---------------- */
 
   _bindEvents() {
@@ -721,11 +766,13 @@ class ThemeEditorCard extends HTMLElement {
     });
 
     root.getElementById("btn-reset").addEventListener("click", () => {
-      if (!confirm("Reset all fields (base, light and dark) and start a new blank theme?")) return;
+      if (!confirm("Reset all fields (base, light, dark, advanced) and start a new blank theme?")) return;
       this._values = {};
       this._modeValues = { light: {}, dark: {} };
       this._activeMode = null;
       this._themeName = "my_custom_theme";
+      this._previewDevice = "desktop";
+      this._advanced = { hoverElevate: true, variant: "elevated", transitionMs: 200 };
       this._saveToStorage();
       this._render();
     });
@@ -826,6 +873,7 @@ class ThemeEditorCard extends HTMLElement {
     const refreshYaml = () => {
       const out = overlay.querySelector("#adv-yaml-out");
       out.value = buildCardModSnippet(this._themeName, this._advanced);
+      this._applyAdvancedPreview();
     };
     refreshYaml();
 

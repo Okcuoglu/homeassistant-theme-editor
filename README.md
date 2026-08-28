@@ -26,7 +26,9 @@ started, no restart needed to try ideas.
   [card-mod](https://github.com/thomasloven/lovelace-card-mod) snippet:
   hover-elevate animation, a global default card style (Elevated / Flat /
   Outlined / Glass-Holo with a theme-color-driven glow pulse), adjustable
-  transition speed, and opt-in per-card classes for exceptions
+  transition speed, and opt-in per-card classes for exceptions - **and you
+  can see all of it live in the mockup preview** while you tune it, using
+  the exact same CSS that gets exported
 - 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
   phone-width layout, not just desktop
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to

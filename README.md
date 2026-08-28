@@ -22,15 +22,23 @@ started, no restart needed to try ideas.
 - 📚 **15 built-in starter presets** across a wide range of moods - from
   clean minimalism to warm materials to retro-technical - to load as a
   jumping-off point
-- ✨ **Advanced (card-mod) tab** - inline, collapsible, right below the
-  preview (no popup) - since animations and per-card variety need CSS
-  injection, not just theme variables, this generates a ready
-  [card-mod](https://github.com/thomasloven/lovelace-card-mod) snippet:
-  hover-elevate animation, a global default card style (Elevated / Flat /
-  Outlined / Glass-Holo with a theme-color-driven glow pulse), adjustable
-  transition speed, and opt-in per-card classes for exceptions - **and you
-  can see all of it live in the preview above it** while you tune it, using
-  the exact same CSS that gets exported
+- 🎨 **Advanced (card-mod)** - inline, collapsible, right below the
+  preview (no popup) - now with real *shape* variety, not just color:
+  - **8 card shapes**: Elevated, Flat, Outlined, Glass/Holo, Angular
+    (clipped corners), Chamfered (octagon corners), Pill (fully rounded),
+    Neon Outline (glowing border)
+  - **4 toggle/switch shapes**: Default, Rounded square, Sharp, Neon glow
+    track - reflected live in the preview; the real-switch card-mod snippet
+    is best-effort since exact selectors vary by HA version (clearly
+    labeled in the generated YAML)
+  - **4 independent, combinable animations**: Glow pulse, Shimmer sweep,
+    Rotating gradient border, Press flash (ripple approximation) - layer
+    any combination on top of any shape
+  - **Compare Shapes gallery** - see all 8 shapes side by side with your
+    current colors/animations applied, click any card to copy its
+    `card_mod: class: ...` snippet
+  - Everything updates live in the preview above it, using the exact same
+    CSS that gets exported
 - 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
   phone-width layout, not just desktop
 - 🖼️ **Full Preview** - a snapshot popup showing 11 common Home Assistant

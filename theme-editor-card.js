@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.7.0";
+const CARD_VERSION = "1.8.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -1045,27 +1045,122 @@ function buildYaml(themeName, values, modeValues) {
 // card-mod YAML snippet (targeting real `ha-card`) and for the live mockup
 // preview (targeting `.mockup-card`), so the preview never drifts from what
 // actually gets exported.
+// Card shape/style variants. Deliberately covers more than color - clip-path
+// cuts, radius extremes, and glow/blur combos - since color alone was the
+// original limitation being addressed here. Kept selector-agnostic (targets
+// whatever selector the caller substitutes: ha-card for the real snippet,
+// .mockup-card for the preview).
 const CARD_VARIANT_DECLS = {
   elevated: "box-shadow: 0 4px 14px rgba(0,0,0,0.35); border: none;",
   flat: "box-shadow: none; border: none;",
   outlined: "box-shadow: none; border: 1px solid var(--divider-color);",
   glass:
-    "background: color-mix(in srgb, var(--card-background-color) 55%, transparent); backdrop-filter: blur(12px) saturate(140%); border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent); box-shadow: 0 0 24px color-mix(in srgb, var(--primary-color) 25%, transparent); animation: theme-editor-holo-pulse 3s ease-in-out infinite;",
+    "background: color-mix(in srgb, var(--card-background-color) 55%, transparent); backdrop-filter: blur(12px) saturate(140%); border: 1px solid color-mix(in srgb, var(--primary-color) 35%, transparent); box-shadow: 0 0 24px color-mix(in srgb, var(--primary-color) 25%, transparent);",
+  angular:
+    "border-radius: 0; border: 1px solid var(--divider-color); clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);",
+  chamfered:
+    "border-radius: 0; border: 1px solid var(--divider-color); clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);",
+  pill: "border-radius: 28px; box-shadow: 0 2px 10px rgba(0,0,0,0.25); border: none;",
+  "neon-outline":
+    "background: color-mix(in srgb, var(--card-background-color) 85%, transparent); border: 2px solid var(--primary-color); box-shadow: 0 0 16px color-mix(in srgb, var(--primary-color) 45%, transparent), inset 0 0 12px color-mix(in srgb, var(--primary-color) 15%, transparent);",
+};
+const CARD_VARIANT_LABELS = {
+  none: "None (plain)",
+  elevated: "Elevated (shadow)",
+  flat: "Flat (no border/shadow)",
+  outlined: "Outlined (border only)",
+  glass: "Glass / Holo (blur)",
+  angular: "Angular (clipped corners)",
+  chamfered: "Chamfered (octagon corners)",
+  pill: "Pill (fully rounded)",
+  "neon-outline": "Neon Outline (glowing border)",
+};
+
+// Toggle/switch shape styles - applied to our own mockup toggle (fully
+// reliable, we own that markup) and offered as a best-effort card-mod
+// snippet for real ha-switch/ha-control-switch elements. Real-switch
+// shadow-piercing selectors vary across HA frontend versions, so that part
+// is clearly labeled as a starting point to adjust, not a guarantee.
+const TOGGLE_STYLE_DECLS = {
+  default: { track: "border-radius: 11px;", knob: "border-radius: 50%;" },
+  square: { track: "border-radius: 6px;", knob: "border-radius: 3px;" },
+  sharp: { track: "border-radius: 0;", knob: "border-radius: 0;" },
+  "neon-track": {
+    track: "border-radius: 11px; box-shadow: 0 0 10px color-mix(in srgb, var(--primary-color) 55%, transparent);",
+    knob: "border-radius: 50%; box-shadow: 0 0 6px color-mix(in srgb, var(--primary-color) 70%, transparent);",
+  },
+};
+const TOGGLE_STYLE_LABELS = {
+  default: "Default (pill)",
+  square: "Rounded square",
+  sharp: "Sharp (0 radius)",
+  "neon-track": "Neon glow track",
+};
+
+const DEFAULT_ADVANCED_STATE = {
+  hoverElevate: true,
+  variant: "elevated",
+  toggleStyle: "default",
+  animations: { glowPulse: false, shimmer: false, rotatingBorder: false, ripple: false },
+  transitionMs: 200,
 };
 
 const HOLO_PULSE_KEYFRAMES = `@keyframes theme-editor-holo-pulse {
       0%, 100% { box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 20%, transparent); }
       50% { box-shadow: 0 0 30px color-mix(in srgb, var(--primary-color) 45%, transparent); }
     }`;
+const SHIMMER_KEYFRAMES = `@keyframes theme-editor-shimmer-sweep {
+      0% { transform: translateX(-120%); }
+      100% { transform: translateX(120%); }
+    }`;
+const ROTATE_BORDER_KEYFRAMES = `@keyframes theme-editor-rotate-border {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }`;
+
+// Builds the animation-related CSS blocks (keyframes + rules) for a given
+// selector. Animations are independent of the card variant/shape now, so
+// any combination (e.g. Pill + Shimmer + Rotating Border) can be layered.
+function buildAnimationBlocks(selector, animations) {
+  const blocks = [];
+  if (animations.glowPulse) {
+    blocks.push(HOLO_PULSE_KEYFRAMES);
+    blocks.push(`${selector} { animation: theme-editor-holo-pulse 3s ease-in-out infinite; }`);
+  }
+  if (animations.shimmer) {
+    blocks.push(SHIMMER_KEYFRAMES);
+    blocks.push(`${selector} { position: relative; overflow: hidden; }`);
+    blocks.push(
+      `${selector}::after { content: ""; position: absolute; top: 0; left: 0; width: 40%; height: 100%; background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--primary-color) 35%, transparent), transparent); animation: theme-editor-shimmer-sweep 3.5s ease-in-out infinite; pointer-events: none; }`
+    );
+  }
+  if (animations.rotatingBorder) {
+    blocks.push(ROTATE_BORDER_KEYFRAMES);
+    blocks.push(`${selector} { position: relative; z-index: 0; }`);
+    blocks.push(
+      `${selector}::before { content: ""; position: absolute; inset: -3px; z-index: -1; border-radius: inherit; background: conic-gradient(var(--primary-color), var(--accent-color), var(--primary-color)); animation: theme-editor-rotate-border 4s linear infinite; }`
+    );
+  }
+  if (animations.ripple) {
+    // Pure-CSS approximation: a brief centered radial flash on press. A true
+    // position-tracked material ripple needs JS (click coordinates), which a
+    // CSS-only card-mod snippet can't do - this is the closest CSS-only effect.
+    blocks.push(
+      `${selector}:active { background-image: radial-gradient(circle, color-mix(in srgb, var(--primary-color) 30%, transparent) 10%, transparent 10.5%); background-size: 300% 300%; background-position: center; transition: background-position 0s; }`
+    );
+  }
+  return blocks;
+}
 
 function buildCardModSnippet(themeName, opts) {
   const ms = opts.transitionMs || 200;
+  const animations = opts.animations || {};
   const globalVariantBlock = opts.variant && opts.variant !== "none" ? `\n      ${CARD_VARIANT_DECLS[opts.variant]}` : "";
+  const toggle = TOGGLE_STYLE_DECLS[opts.toggleStyle] || TOGGLE_STYLE_DECLS.default;
 
   const lines = [];
   lines.push(`  card-mod-theme: "${themeName}"`);
   lines.push(`  card-mod-card: |`);
-  lines.push(`    ${HOLO_PULSE_KEYFRAMES}`);
   lines.push(`    ha-card {`);
   lines.push(`      transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;${globalVariantBlock}`);
   lines.push(`    }`);
@@ -1075,23 +1170,37 @@ function buildCardModSnippet(themeName, opts) {
     lines.push(`      box-shadow: 0 10px 24px rgba(0,0,0,0.4);`);
     lines.push(`    }`);
   }
-  lines.push(`    /* Per-card overrides: add card_mod: { class: elevated|flat|outlined|glass-holo }`);
-  lines.push(`       to an individual card's config to opt just that card into a different look. */`);
-  lines.push(`    ha-card.elevated { ${CARD_VARIANT_DECLS.elevated} }`);
-  lines.push(`    ha-card.flat { ${CARD_VARIANT_DECLS.flat} }`);
-  lines.push(`    ha-card.outlined { ${CARD_VARIANT_DECLS.outlined} }`);
-  lines.push(`    ha-card.glass-holo { ${CARD_VARIANT_DECLS.glass} }`);
+  for (const block of buildAnimationBlocks("ha-card", animations)) {
+    lines.push(`    ${block}`);
+  }
+  lines.push(`    /* Per-card shape overrides: add card_mod: { class: elevated|flat|outlined|glass-holo|`);
+  lines.push(`       angular|chamfered|pill|neon-outline } to an individual card's config to opt just`);
+  lines.push(`       that card into a different look than the global default above. */`);
+  for (const key of Object.keys(CARD_VARIANT_DECLS)) {
+    const className = key === "glass" ? "glass-holo" : key;
+    lines.push(`    ha-card.${className} { ${CARD_VARIANT_DECLS[key]} }`);
+  }
+  if (opts.toggleStyle && opts.toggleStyle !== "default") {
+    lines.push(``);
+    lines.push(`    /* Toggle/switch shape - BEST EFFORT. The exact element and shadow-DOM`);
+    lines.push(`       structure for switches varies by Home Assistant frontend version and`);
+    lines.push(`       card type (ha-switch, ha-control-switch, mwc-switch all exist across`);
+    lines.push(`       versions). If this doesn't visibly change anything, inspect the real`);
+    lines.push(`       switch with your browser's DevTools (F12) and adjust the selector below. */`);
+    lines.push(`    ha-control-switch$ .switch { ${toggle.track} }`);
+    lines.push(`    ha-switch$ .mdc-switch__thumb { ${toggle.knob} }`);
+  }
   return lines.join("\n") + "\n";
 }
 
 // Builds plain CSS (not YAML) for the live mockup preview, targeting
 // .mockup-card instead of ha-card, using the exact same variant/hover/
-// transition logic as buildCardModSnippet.
+// transition/animation logic as buildCardModSnippet.
 function buildPreviewAdvancedCss(advanced) {
   const ms = advanced.transitionMs || 200;
+  const animations = advanced.animations || {};
   const variantDecl = advanced.variant && advanced.variant !== "none" ? CARD_VARIANT_DECLS[advanced.variant] : "";
   let css = `
-    ${HOLO_PULSE_KEYFRAMES}
     .mockup-card {
       transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;
       ${variantDecl}
@@ -1104,6 +1213,13 @@ function buildPreviewAdvancedCss(advanced) {
       box-shadow: 0 10px 24px rgba(0,0,0,0.4);
     }`;
   }
+  css += "\n" + buildAnimationBlocks(".mockup-card", animations).join("\n");
+
+  const toggle = TOGGLE_STYLE_DECLS[advanced.toggleStyle] || TOGGLE_STYLE_DECLS.default;
+  css += `
+    .mockup-toggle.adv-toggle { ${toggle.track} }
+    .mockup-toggle.adv-toggle .knob { ${toggle.knob} }
+  `;
   return css;
 }
 
@@ -1177,7 +1293,7 @@ class ThemeEditorCard extends HTMLElement {
     this._modeValues = { light: {}, dark: {} };
     this._activeMode = null; // null = base (both modes), or "light" / "dark"
     this._previewDevice = "desktop"; // "desktop" | "mobile"
-    this._advanced = { hoverElevate: true, variant: "elevated", transitionMs: 200 };
+    this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
     this._advancedOpen = false;
     this._themeName = "my_custom_theme";
     this._openGroups = new Set([FIELD_GROUPS[0].id]);
@@ -1213,7 +1329,13 @@ class ThemeEditorCard extends HTMLElement {
         this._modeValues = parsed.modeValues || { light: {}, dark: {} };
         this._themeName = parsed.themeName || "my_custom_theme";
         this._previewDevice = parsed.previewDevice || "desktop";
-        this._advanced = parsed.advanced || { hoverElevate: true, variant: "elevated", transitionMs: 200 };
+        // Merge with defaults so older localStorage snapshots (before toggleStyle/
+        // animations existed) don't crash on missing fields.
+        this._advanced = {
+          ...DEFAULT_ADVANCED_STATE,
+          ...(parsed.advanced || {}),
+          animations: { ...DEFAULT_ADVANCED_STATE.animations, ...((parsed.advanced && parsed.advanced.animations) || {}) },
+        };
       }
     } catch (e) {
       // ignore corrupt storage
@@ -1388,7 +1510,7 @@ class ThemeEditorCard extends HTMLElement {
               <div class="mockup-card-title">Living Room Light</div>
               <div class="mockup-row">
                 <span class="mockup-label">On/Off</span>
-                <span class="mockup-toggle on"><span class="knob"></span></span>
+                <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
               </div>
               <div class="mockup-slider"><span class="mockup-slider-fill"></span></div>
             </div>
@@ -1532,7 +1654,7 @@ class ThemeEditorCard extends HTMLElement {
       this._activeMode = null;
       this._themeName = "my_custom_theme";
       this._previewDevice = "desktop";
-      this._advanced = { hoverElevate: true, variant: "elevated", transitionMs: 200 };
+      this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
       this._saveToStorage();
       this._render();
     });
@@ -1573,9 +1695,10 @@ class ThemeEditorCard extends HTMLElement {
   }
 
   _advancedBodyHtml() {
+    const a = this._advanced;
     return `
       <div class="dialog-sub">
-        Theme variables alone can't do animations or per-card variety - that needs
+        Theme variables alone can't do shapes, buttons, or animations - that needs
         <strong>card-mod</strong> (a separate, very popular HACS integration). This generates
         a ready-to-paste snippet: a global default look for every card, plus opt-in classes
         for individual cards. Colors reference your theme variables, so it adapts to whatever
@@ -1584,34 +1707,57 @@ class ThemeEditorCard extends HTMLElement {
 
       <div class="adv-controls">
         <label class="adv-row">
-          <input type="checkbox" id="adv-hover" ${this._advanced.hoverElevate ? "checked" : ""} />
+          <input type="checkbox" id="adv-hover" ${a.hoverElevate ? "checked" : ""} />
           Hover-elevate animation (card lifts slightly on mouseover)
         </label>
 
         <label class="adv-row">
-          <span>Global default card variant</span>
+          <span>Card shape / variant</span>
           <select id="adv-variant">
-            <option value="none" ${this._advanced.variant === "none" ? "selected" : ""}>None (plain)</option>
-            <option value="elevated" ${this._advanced.variant === "elevated" ? "selected" : ""}>Elevated (shadow)</option>
-            <option value="flat" ${this._advanced.variant === "flat" ? "selected" : ""}>Flat (no border/shadow)</option>
-            <option value="outlined" ${this._advanced.variant === "outlined" ? "selected" : ""}>Outlined (border only)</option>
-            <option value="glass" ${this._advanced.variant === "glass" ? "selected" : ""}>Glass / Holo (blur + glow pulse)</option>
+            ${Object.entries(CARD_VARIANT_LABELS)
+              .map(([key, label]) => `<option value="${key}" ${a.variant === key ? "selected" : ""}>${label}</option>`)
+              .join("")}
           </select>
         </label>
 
         <label class="adv-row">
-          <span>Transition speed: <strong id="adv-ms-label">${this._advanced.transitionMs}ms</strong></span>
-          <input type="range" id="adv-ms" min="50" max="600" step="10" value="${this._advanced.transitionMs}" />
+          <span>Toggle / switch shape</span>
+          <select id="adv-toggle-style">
+            ${Object.entries(TOGGLE_STYLE_LABELS)
+              .map(([key, label]) => `<option value="${key}" ${a.toggleStyle === key ? "selected" : ""}>${label}</option>`)
+              .join("")}
+          </select>
+        </label>
+
+        <div class="adv-row">
+          <span>Animations (combinable, layered on top of the shape above)</span>
+          <div class="adv-checkbox-grid">
+            <label><input type="checkbox" id="adv-anim-glow" ${a.animations.glowPulse ? "checked" : ""} /> Glow pulse</label>
+            <label><input type="checkbox" id="adv-anim-shimmer" ${a.animations.shimmer ? "checked" : ""} /> Shimmer sweep</label>
+            <label><input type="checkbox" id="adv-anim-rotate" ${a.animations.rotatingBorder ? "checked" : ""} /> Rotating gradient border</label>
+            <label><input type="checkbox" id="adv-anim-ripple" ${a.animations.ripple ? "checked" : ""} /> Press flash (ripple approximation)</label>
+          </div>
+        </div>
+
+        <label class="adv-row">
+          <span>Transition speed: <strong id="adv-ms-label">${a.transitionMs}ms</strong></span>
+          <input type="range" id="adv-ms" min="50" max="600" step="10" value="${a.transitionMs}" />
         </label>
       </div>
 
+      <div class="adv-row" style="margin-top: 4px;">
+        <button class="btn-flat btn-small" id="adv-compare">⇔ Compare all shapes</button>
+      </div>
+
       <div class="adv-yaml-label">Paste this into your theme file (merges alongside the fields above):</div>
-      <textarea id="adv-yaml-out" rows="10" readonly></textarea>
+      <textarea id="adv-yaml-out" rows="12" readonly></textarea>
 
       <div class="dialog-sub">
-        To use a variant on just one card instead of the global default, add to that card's
-        config:
-        <code>card_mod:\u000A&nbsp;&nbsp;class: flat</code> (or <code>elevated</code> / <code>outlined</code> / <code>glass-holo</code>).
+        To use a shape on just one card instead of the global default, add to that card's
+        config: <code>card_mod:\u000A&nbsp;&nbsp;class: pill</code> (or any other shape name shown
+        in the dropdown, using its lowercase id - see the comment inside the generated YAML).
+        The toggle/switch snippet is best-effort - see the comment in the YAML if it doesn't
+        visibly apply to your HA version.
       </div>
 
       <div class="adv-actions">
@@ -1641,12 +1787,31 @@ class ThemeEditorCard extends HTMLElement {
       this._saveToStorage();
       refresh();
     });
+    root.getElementById("adv-toggle-style").addEventListener("change", (e) => {
+      this._advanced.toggleStyle = e.target.value;
+      this._saveToStorage();
+      refresh();
+    });
+    const animMap = {
+      "adv-anim-glow": "glowPulse",
+      "adv-anim-shimmer": "shimmer",
+      "adv-anim-rotate": "rotatingBorder",
+      "adv-anim-ripple": "ripple",
+    };
+    for (const [id, key] of Object.entries(animMap)) {
+      root.getElementById(id).addEventListener("change", (e) => {
+        this._advanced.animations[key] = e.target.checked;
+        this._saveToStorage();
+        refresh();
+      });
+    }
     root.getElementById("adv-ms").addEventListener("input", (e) => {
       this._advanced.transitionMs = parseInt(e.target.value, 10);
       root.getElementById("adv-ms-label").textContent = `${this._advanced.transitionMs}ms`;
       this._saveToStorage();
       refresh();
     });
+    root.getElementById("adv-compare").addEventListener("click", () => this._openVariantGalleryDialog());
     root.getElementById("adv-copy").addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(out.value);
@@ -1658,6 +1823,73 @@ class ThemeEditorCard extends HTMLElement {
       } catch (e) {
         // clipboard API unavailable - user can select the textarea manually
       }
+    });
+  }
+
+  _openVariantGalleryDialog() {
+    const existing = this.shadowRoot.getElementById("variant-gallery-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "variant-gallery-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="dialog dialog-full">
+        <div class="dialog-title-row">
+          <div class="dialog-title">Compare Shapes</div>
+          <button class="btn-flat btn-small" id="vg-close">Close</button>
+        </div>
+        <div class="dialog-sub">
+          All ${Object.keys(CARD_VARIANT_LABELS).length - 1} card shapes side by side, with your
+          current animations and colors applied. Click a card's name to copy the
+          <code>card_mod: class: ...</code> value for that shape.
+        </div>
+        <div class="fp-grid" id="vg-grid">
+          ${Object.entries(CARD_VARIANT_LABELS)
+            .filter(([key]) => key !== "none")
+            .map(
+              ([key, label]) => `
+              <div class="mockup-card fp-card vg-card" data-variant="${key}" style="${key !== "none" ? CARD_VARIANT_DECLS[key] : ""}">
+                <div class="mockup-card-title">${label}</div>
+                <div class="mockup-row">
+                  <span class="mockup-label">On/Off</span>
+                  <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
+                </div>
+                <div class="mockup-slider"><span class="mockup-slider-fill" style="width:60%"></span></div>
+                <button class="vg-copy-class" data-class="${key === "glass" ? "glass-holo" : key}">card_mod: class: ${key === "glass" ? "glass-holo" : key}</button>
+              </div>
+            `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    const dialogEl = overlay.querySelector(".dialog-full");
+    this._applyVarsToElement(dialogEl, this._computeEffectiveVars());
+
+    // Animations (independent of shape) applied uniformly across every card in the gallery,
+    // same as the live preview - only the shape/variant itself differs per card.
+    const styleTag = document.createElement("style");
+    styleTag.textContent = buildAnimationBlocks(".vg-card", this._advanced.animations).join("\n");
+    overlay.appendChild(styleTag);
+
+    overlay.querySelector("#vg-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelectorAll(".vg-copy-class").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(`card_mod:\n  class: ${btn.dataset.class}`);
+          const original = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => {
+            btn.textContent = original;
+          }, 1500);
+        } catch (err) {
+          // clipboard unavailable - non-fatal, button still shows the value to copy manually
+        }
+      });
     });
   }
 
@@ -1704,7 +1936,7 @@ class ThemeEditorCard extends HTMLElement {
         <div class="mockup-card-title">Living Room Light</div>
         <div class="mockup-row">
           <span class="mockup-label">On/Off</span>
-          <span class="mockup-toggle on"><span class="knob"></span></span>
+          <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
         </div>
         <div class="mockup-slider"><span class="mockup-slider-fill" style="width:72%"></span></div>
       </div>
@@ -1756,7 +1988,7 @@ class ThemeEditorCard extends HTMLElement {
 
       <div class="mockup-card fp-card fp-entities">
         <div class="mockup-card-title">Entities</div>
-        <div class="fp-entity-row"><span class="fp-entity-icon">💡</span><span class="fp-entity-name">Kitchen Light</span><span class="mockup-toggle on"><span class="knob"></span></span></div>
+        <div class="fp-entity-row"><span class="fp-entity-icon">💡</span><span class="fp-entity-name">Kitchen Light</span><span class="mockup-toggle adv-toggle on"><span class="knob"></span></span></div>
         <div class="fp-entity-row"><span class="fp-entity-icon">🌡</span><span class="fp-entity-name">Living Room Temp</span><span class="fp-entity-value">21.4°C</span></div>
         <div class="fp-entity-row"><span class="fp-entity-icon">🔒</span><span class="fp-entity-name">Front Door</span><span class="fp-entity-value">Locked</span></div>
       </div>
@@ -2164,6 +2396,15 @@ class ThemeEditorCard extends HTMLElement {
       .fp-badge-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
       .fp-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
 
+      /* Variant comparison gallery */
+      .vg-copy-class {
+        margin-top: 10px; width: 100%; padding: 5px 8px; font-size: 10px;
+        font-family: monospace; border-radius: 4px; cursor: pointer;
+        background: rgba(127,127,127,0.12); border: 1px solid var(--divider-color, #292929);
+        color: var(--secondary-text-color, #a3a3a3);
+      }
+      .vg-copy-class:hover { background: rgba(127,127,127,0.22); }
+
 
       /* Import dialog */
       .overlay {
@@ -2204,13 +2445,18 @@ class ThemeEditorCard extends HTMLElement {
 
       .adv-controls { display: flex; flex-direction: column; gap: 12px; }
       .adv-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-      .adv-row:has(input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 8px; }
+      .adv-row:has(> input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 8px; }
       .adv-row select, .adv-row input[type="range"] { width: 100%; }
       .adv-row select {
         padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color, #444);
         background: var(--primary-background-color, #111); color: inherit;
       }
       .adv-yaml-label { font-size: 12px; color: var(--secondary-text-color, #888); margin-top: 4px; }
+      .adv-checkbox-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 4px;
+      }
+      .adv-checkbox-grid label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: normal; }
+      @media (max-width: 420px) { .adv-checkbox-grid { grid-template-columns: 1fr; } }
       #adv-yaml-out {
         width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px;
         background: var(--primary-background-color, #111); color: inherit;

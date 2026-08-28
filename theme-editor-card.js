@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.5";
+const CARD_VERSION = "2.0.6";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -2995,7 +2995,7 @@ class ThemeEditorCard extends HTMLElement {
 
       /* ---------- YAML dialog ---------- */
       .te-dialog-yaml {
-        width: clamp(600px, 92vw, 1500px); height: clamp(500px, 88vh, 950px);
+        width: clamp(600px, 96vw, 1800px); height: clamp(500px, 90vh, 1000px);
         display: flex; flex-direction: column; padding: 0; overflow: hidden;
         background: #0b1216; position: relative;
       }
@@ -3006,10 +3006,16 @@ class ThemeEditorCard extends HTMLElement {
       }
       .te-yaml-guide-link { font-size: 11.5px; color: var(--te-accent); text-decoration: none; white-space: nowrap; }
       .te-yaml-guide-link:hover { text-decoration: underline; }
-      .te-yaml-code { margin: 0; flex: 1; overflow: auto; padding: 12px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8; white-space: pre; }
+      .te-yaml-code {
+        margin: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 16px;
+        font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8;
+        white-space: pre-wrap; word-break: break-word;
+        user-select: text; -webkit-user-select: text; -moz-user-select: text; cursor: text;
+      }
 
       /* ---------- Dialogs ---------- */
       .te-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
+      .te-overlay, .te-overlay * { user-select: text; -webkit-user-select: text; -moz-user-select: text; }
       .te-dialog {
         background: var(--te-surface); color: var(--te-text); padding: 18px; border-radius: 10px;
         width: min(480px, 90vw); display: flex; flex-direction: column; gap: 10px;

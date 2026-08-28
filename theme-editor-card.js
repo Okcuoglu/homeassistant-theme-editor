@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.6";
+const CARD_VERSION = "2.2.0";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -988,6 +988,25 @@ const FIELD_GROUPS = [
     ],
   },
   {
+    id: "inputs",
+    label: "Input Fields",
+    hint: "Backgrounds and text of text fields, dropdowns, and search boxes across ALL of Home Assistant (not just cards) - e.g. the automation editor, entity search, HACS dialogs. These variable names have shifted across recent HA versions (Material Design 3 migration in 2026.4 introduced the md-sys-color-* set below alongside the older mdc-/input- set) - if one set doesn't visibly apply on your HA version, the other one is the fallback to try.",
+    fields: [
+      { key: "input-fill-color", label: "Fill (legacy)", type: "color", default: "#1e1e1e" },
+      { key: "input-ink-color", label: "Text (legacy)", type: "color", default: "#ffffff" },
+      { key: "input-label-ink-color", label: "Label (legacy)", type: "color", default: "#a3a3a3" },
+      { key: "input-disabled-ink-color", label: "Disabled text (legacy)", type: "color", default: "#5c5c5c" },
+      { key: "input-idle-line-color", label: "Idle underline (legacy)", type: "color", default: "#5c5c5c" },
+      { key: "input-hover-line-color", label: "Hover underline (legacy)", type: "color", default: "#ffffff" },
+      { key: "mdc-text-field-fill-color", label: "Text field fill", type: "color", default: "#1e1e1e" },
+      { key: "mdc-select-fill-color", label: "Select/dropdown fill", type: "color", default: "#1e1e1e" },
+      { key: "md-sys-color-surface", label: "MD3 surface", type: "color", default: "#1e1e1e" },
+      { key: "md-sys-color-surface-container", label: "MD3 surface container", type: "color", default: "#1e1e1e" },
+      { key: "md-sys-color-on-surface", label: "MD3 text on surface", type: "color", default: "#ffffff" },
+      { key: "md-sys-color-on-surface-variant", label: "MD3 text on surface (muted)", type: "color", default: "#a3a3a3" },
+    ],
+  },
+  {
     id: "badges",
     label: "Label Badges",
     hint: "Five fixed badge colors.",
@@ -1001,6 +1020,19 @@ const FIELD_GROUPS = [
   },
 ];
 const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
+const KNOWN_FIELD_KEYS = new Set(ALL_FIELDS.map((f) => f.key));
+
+// Domains Home Assistant documents as supporting per-state color overrides
+// (state-{domain}-{device_class}-{state}-color, state-{domain}-{state}-color,
+// state-{domain}-(active|inactive)-color) - see the "State color" section of
+// https://www.home-assistant.io/integrations/frontend/#state-color
+const STATE_COLOR_DOMAINS = [
+  "alarm_control_panel", "alert", "automation", "binary_sensor", "calendar",
+  "camera", "climate", "cover", "device_tracker", "fan", "group", "humidifier",
+  "input_boolean", "light", "lock", "media_player", "person", "plant",
+  "remote", "schedule", "script", "siren", "sun", "switch", "timer",
+  "update", "vacuum",
+];
 
 /* ---------------------------------------------------------------------- */
 /* Minimal flat-YAML helpers (no external deps)                           */
@@ -1008,13 +1040,20 @@ const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
 
 // Builds a theme YAML block. `modeValues` is optional: { light: {...}, dark: {...} }.
 // Mode-independent (base) vars are written at the top level; only fields the
-// user actually touched in a given mode are written under `modes:`.
+// user actually touched in a given mode are written under `modes:`. Any key
+// present in `values`/mode overrides that ISN'T one of our ~73 known fields
+// (e.g. a custom state-light-on-color entry) is still emitted - see the
+// Custom Variables section, which writes directly into the same store.
 function buildYaml(themeName, values, modeValues) {
   const lines = [`${themeName}:`];
   for (const field of ALL_FIELDS) {
     const val = values[field.key];
     if (val === undefined || val === null || val === "") continue;
     lines.push(`  ${field.key}: "${val}"`);
+  }
+  for (const [key, val] of Object.entries(values)) {
+    if (KNOWN_FIELD_KEYS.has(key) || !val) continue;
+    lines.push(`  ${key}: "${val}"`);
   }
 
   const light = (modeValues && modeValues.light) || {};
@@ -1030,12 +1069,20 @@ function buildYaml(themeName, values, modeValues) {
         const val = light[field.key];
         if (val) lines.push(`      ${field.key}: "${val}"`);
       }
+      for (const [key, val] of Object.entries(light)) {
+        if (KNOWN_FIELD_KEYS.has(key) || !val) continue;
+        lines.push(`      ${key}: "${val}"`);
+      }
     }
     if (hasDark) {
       lines.push(`    dark:`);
       for (const field of ALL_FIELDS) {
         const val = dark[field.key];
         if (val) lines.push(`      ${field.key}: "${val}"`);
+      }
+      for (const [key, val] of Object.entries(dark)) {
+        if (KNOWN_FIELD_KEYS.has(key) || !val) continue;
+        lines.push(`      ${key}: "${val}"`);
       }
     }
   }
@@ -1712,6 +1759,7 @@ function parseYaml(text) {
 const SECTIONS = [
   { id: "advanced", label: "Advanced", isAdvanced: true },
   ...FIELD_GROUPS.map((g) => ({ id: g.id, label: g.label, hint: g.hint, fields: g.fields })),
+  { id: "custom", label: "Custom Variables", isCustom: true },
 ];
 
 /* ---------------------------------------------------------------------- */
@@ -1976,7 +2024,7 @@ class ThemeEditorCard extends HTMLElement {
         <div class="te-nav-label">Sections</div>
         ${SECTIONS.map((s) => {
           const on = s.id === this._activeSection;
-          const count = s.isAdvanced ? "card-mod" : String(s.fields.length);
+          const count = s.isAdvanced ? "card-mod" : s.isCustom ? String(this._customVarCount()) : String(s.fields.length);
           return `
             <button class="te-nav-row ${on ? "on" : ""}" data-section="${s.id}">
               <span class="te-nav-marker"></span>
@@ -1989,11 +2037,18 @@ class ThemeEditorCard extends HTMLElement {
     `;
   }
 
+  _customVarCount() {
+    const store = this._activeStore();
+    return Object.keys(store).filter((k) => !KNOWN_FIELD_KEYS.has(k)).length;
+  }
+
   _contentHtml() {
     const s = SECTIONS.find((x) => x.id === this._activeSection) || SECTIONS[0];
-    const count = s.isAdvanced ? "3 groups" : `${s.fields.length} fields`;
+    const count = s.isAdvanced ? "3 groups" : s.isCustom ? `${this._customVarCount()} set` : `${s.fields.length} fields`;
     const hint = s.isAdvanced
-      ? "Shapes, animations, and backgrounds need card-mod. Changes apply instantly in the preview to the right; the YAML lives in the drawer below."
+      ? "Shapes, animations, and backgrounds need card-mod. Changes apply instantly in the preview to the right; open the YAML popup (topbar) to export."
+      : s.isCustom
+      ? "Anything not covered by the sections above - most commonly per-entity state colors (state-{domain}-{device_class}-{state}-color), which Home Assistant supports for a large, open-ended set of domains/states/device classes that don't fit as fixed fields. See the quick-add helper below, or type any variable name directly."
       : s.hint;
     return `
       <div class="te-content-inner">
@@ -2002,7 +2057,7 @@ class ThemeEditorCard extends HTMLElement {
           <span class="te-content-count">${count}</span>
         </div>
         <div class="te-content-hint">${hint}</div>
-        ${s.isAdvanced ? this._advancedContentHtml() : this._fieldsGridHtml(s.fields)}
+        ${s.isAdvanced ? this._advancedContentHtml() : s.isCustom ? this._customVarsContentHtml() : this._fieldsGridHtml(s.fields)}
       </div>
     `;
   }
@@ -2150,6 +2205,77 @@ class ThemeEditorCard extends HTMLElement {
             `;
           }).join("")}
         </div>
+      </div>
+    `;
+  }
+
+  _customVarsContentHtml() {
+    const store = this._activeStore();
+    const entries = Object.entries(store).filter(([k]) => !KNOWN_FIELD_KEYS.has(k));
+    return `
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Quick add: entity state color</div>
+          <span class="te-adv-block-note">state-{domain}-{state}-color</span>
+        </div>
+        <div class="te-content-hint" style="margin-bottom: 12px;">
+          Builds a key following Home Assistant's documented pattern:
+          <code>state-{domain}-{device_class}-{state}-color</code> (device class
+          optional) or <code>state-{domain}-{state}-color</code>. More specific
+          keys win over less specific ones.
+        </div>
+        <div class="te-cv-quickadd">
+          <select id="cv-domain">
+            ${STATE_COLOR_DOMAINS.map((d) => `<option value="${d}">${d}</option>`).join("")}
+          </select>
+          <input type="text" id="cv-device-class" placeholder="device_class (optional)" />
+          <input type="text" id="cv-state" placeholder="state, e.g. on / open / heating" value="on" />
+          <input type="color" id="cv-color" value="#03a9f4" />
+          <button class="te-btn te-btn-small" id="cv-add">+ Add</button>
+        </div>
+      </div>
+
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Add any variable</div>
+          <span class="te-adv-block-note">for anything not covered above</span>
+        </div>
+        <div class="te-cv-freeform">
+          <input type="text" id="cv-free-key" placeholder="variable-name" />
+          <input type="text" id="cv-free-value" placeholder="value" />
+          <button class="te-btn te-btn-small" id="cv-free-add">+ Add</button>
+        </div>
+      </div>
+
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Currently set</div>
+          <span class="te-adv-block-note">${entries.length}</span>
+        </div>
+        ${
+          entries.length
+            ? `<div class="te-field-grid">${entries.map(([k, v]) => this._customVarRowHtml(k, v)).join("")}</div>`
+            : `<div class="te-content-hint">None yet - use one of the add options above.</div>`
+        }
+      </div>
+    `;
+  }
+
+  _customVarRowHtml(key, value) {
+    const isColor = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+    return `
+      <div class="te-field-row">
+        ${
+          isColor
+            ? `<input type="color" class="te-swatch" data-cv-color="${this._escAttr(key)}" value="${value}" />`
+            : `<div class="te-swatch te-unit-box">txt</div>`
+        }
+        <div class="te-field-names">
+          <div class="te-field-label" style="font-family:'IBM Plex Mono',monospace; font-size:11.5px;">${key}</div>
+          <div class="te-field-key">custom variable</div>
+        </div>
+        <input type="text" class="te-field-hex" data-cv-text="${this._escAttr(key)}" value="${this._escAttr(value)}" />
+        <button class="te-field-clear" data-cv-remove="${this._escAttr(key)}" title="Remove">✕</button>
       </div>
     `;
   }
@@ -2424,6 +2550,61 @@ class ThemeEditorCard extends HTMLElement {
     root.querySelectorAll("[data-bg]").forEach((btn) => {
       btn.addEventListener("click", () => {
         this._advanced.background = btn.dataset.bg;
+        this._markDirty();
+        this._render();
+      });
+    });
+
+    // Custom Variables section
+    const cvAddBtn = root.getElementById("cv-add");
+    if (cvAddBtn) {
+      cvAddBtn.addEventListener("click", () => {
+        const domain = root.getElementById("cv-domain").value;
+        const deviceClass = root.getElementById("cv-device-class").value.trim();
+        const state = root.getElementById("cv-state").value.trim() || "on";
+        const color = root.getElementById("cv-color").value;
+        const key = deviceClass ? `state-${domain}-${deviceClass}-${state}-color` : `state-${domain}-${state}-color`;
+        this._activeStore()[key] = color;
+        this._markDirty();
+        this._render();
+      });
+    }
+    const cvFreeAddBtn = root.getElementById("cv-free-add");
+    if (cvFreeAddBtn) {
+      cvFreeAddBtn.addEventListener("click", () => {
+        const key = root.getElementById("cv-free-key").value.trim();
+        const value = root.getElementById("cv-free-value").value.trim();
+        if (!key || !value) return;
+        this._activeStore()[key] = value;
+        this._markDirty();
+        this._render();
+      });
+    }
+    root.querySelectorAll("[data-cv-color]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const key = e.target.dataset.cvColor;
+        this._activeStore()[key] = e.target.value;
+        this._markDirty();
+        root.querySelectorAll("[data-cv-text]").forEach((textInput) => {
+          if (textInput.dataset.cvText === key) textInput.value = e.target.value;
+        });
+      });
+    });
+    root.querySelectorAll("[data-cv-text]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const key = e.target.dataset.cvText;
+        this._activeStore()[key] = e.target.value;
+        this._markDirty();
+        if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(e.target.value)) {
+          root.querySelectorAll("[data-cv-color]").forEach((colorInput) => {
+            if (colorInput.dataset.cvColor === key) colorInput.value = e.target.value;
+          });
+        }
+      });
+    });
+    root.querySelectorAll("[data-cv-remove]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        delete this._activeStore()[btn.dataset.cvRemove];
         this._markDirty();
         this._render();
       });
@@ -2940,6 +3121,22 @@ class ThemeEditorCard extends HTMLElement {
       .te-bg-stage {
         position: relative; overflow: hidden; height: 52px; border-radius: 5px; background: var(--primary-background-color, #0f1c2e);
         transform: translateZ(0); /* containment for position:fixed inside background CSS - see JS comment */
+      }
+
+      /* ---------- Custom Variables section ---------- */
+      .te-cv-quickadd, .te-cv-freeform {
+        display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      }
+      .te-cv-quickadd select, .te-cv-quickadd input[type="text"],
+      .te-cv-freeform input[type="text"] {
+        height: 32px; padding: 0 10px; border-radius: 6px; border: 1px solid #2c3d47;
+        background: var(--te-input); color: var(--te-text); font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px;
+      }
+      .te-cv-quickadd select { min-width: 160px; }
+      .te-cv-quickadd input[type="text"] { min-width: 140px; flex: 1; }
+      .te-cv-freeform input[type="text"] { flex: 1; min-width: 160px; font-family: 'IBM Plex Mono', monospace; }
+      .te-cv-quickadd input[type="color"] {
+        width: 32px; height: 32px; padding: 0; border-radius: 6px; border: 1px solid #2c3d47; background: none; cursor: pointer;
       }
 
       /* ---------- Preview column ---------- */

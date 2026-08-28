@@ -24,15 +24,16 @@ column of accordions:
   scrolling back and forth. Switch between Phone / Tablet / Wall Panel
   widths, jump to a full-card gallery, or open the shape comparison from
   its footer.
-- **YAML drawer** (bottom, toggleable) - three tabs (Variables / Card Shape
+- **YAML popup** (opened from the topbar) - three tabs (Variables / Card Shape
   / Background) replace three separate copy buttons that used to be
   scattered through the page.
 
 ## Features
 
-- 🎨 **61 theme variables** across 11 sections (primary colors,
+- 🎨 **73 fixed theme variables** across 12 sections (primary colors,
   backgrounds, text, sidebar, cards & shape, typography, status colors,
-  switches, slider & lines, dialogs, label badges)
+  switches, slider & lines, dialogs, input fields, label badges), plus
+  unlimited **custom variables** for anything else (see below)
 - 🌗 **Light/Dark mode editing** - edit shared base values once, then switch
   to Light or Dark to add mode-specific overrides, with a one-click "copy
   from other mode" starting point
@@ -68,9 +69,24 @@ column of accordions:
   card types (light, thermostat, weather, media player, history graph,
   entities list, alarm panel, camera, button card, gauge, status badges)
   all styled with your current theme
+- ⌨️ **Input Fields section** - backgrounds/text/underlines for text fields,
+  dropdowns, and search boxes across *all* of Home Assistant, not just
+  cards (the automation editor, entity search, other integrations'
+  dialogs). Covers both the legacy `input-*`/`mdc-*` variable set and the
+  newer `md-sys-color-*` set HA introduced with its Material Design 3
+  migration - these are more version-dependent than most other variables,
+  see [YAML-GUIDE.md](YAML-GUIDE.md) if one set doesn't visibly apply
+- 🧩 **Custom Variables section** - an escape hatch for anything not
+  covered by the 73 built-in fields, most notably Home Assistant's
+  per-entity **state colors** (`state-{domain}-{device_class}-{state}-color`,
+  e.g. `state-cover-garage-open-color`) - a huge, open-ended combination
+  of 27 domains × arbitrary states/device classes that can't reasonably be
+  fixed fields. Includes a quick-add helper that builds the correct key
+  from a domain dropdown + optional device class + state, plus a free-form
+  "any variable" field for anything else
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
-- 📋 **Export** via clipboard copy or `.yaml` file download, per YAML-drawer
+- 📋 **Export** via clipboard copy or `.yaml` file download, per YAML popup
   tab (variables / card shape / background separately)
 - 💾 Autosaves your work-in-progress to browser `localStorage` so a refresh
   won't lose your edits, plus an explicit **Save** with an unsaved-changes
@@ -115,7 +131,7 @@ Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 1. Give your theme a name in the topbar
 2. Pick a section from the left nav and adjust values - the preview updates
    live on the right
-3. Open the **YAML** drawer (topbar button) and pick the Variables / Card
+3. Open the **YAML** popup (topbar button) and pick the Variables / Card
    Shape / Background tab you need, then **Copy** or **Load .yaml**
 4. Paste/save the result into `/config/themes/<your_theme>.yaml`
 5. Make sure your `configuration.yaml` includes:
@@ -133,7 +149,7 @@ Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 > inheriting the base value.
 
 > **Full walkthrough:** see [YAML-GUIDE.md](YAML-GUIDE.md) for how to
-> combine all three YAML-drawer tabs into one theme file, per-card and
+> combine all three YAML popup tabs into one theme file, per-card and
 > per-view overrides, and troubleshooting.
 
 ## Why no direct "save to server"?

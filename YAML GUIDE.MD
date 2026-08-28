@@ -1,11 +1,46 @@
 # Working With the Generated YAML
 
-The YAML drawer has three tabs - **Variables**, **Card Shape**, and
+The YAML popup has three tabs - **Variables**, **Card Shape**, and
 **Background**. They're separate tabs because they're separate concerns
 (and, for Card Shape/Background, a separate card-mod feature), but they all
 belong in **one theme file** in the end. This guide walks through combining
 them correctly, installing them, and the most common things that trip
 people up.
+
+## Custom Variables and entity state colors
+
+Beyond the 73 built-in fields, Home Assistant supports styling individual
+entities by domain/device-class/state - most commonly used to give
+different colors to, say, an open garage door vs. a closed one, or a
+heating thermostat vs. an idle one. The pattern (from [Home Assistant's
+own docs](https://www.home-assistant.io/integrations/frontend/#state-color)):
+
+```
+state-{domain}-{device_class}-{state}-color
+state-{domain}-{state}-color
+state-{domain}-(active|inactive)-color
+state-(active|inactive)-color
+```
+
+More specific rules win over less specific ones. Supported domains:
+`alarm_control_panel`, `alert`, `automation`, `binary_sensor`, `calendar`,
+`camera`, `climate`, `cover`, `device_tracker`, `fan`, `group`,
+`humidifier`, `input_boolean`, `light`, `lock`, `media_player`, `person`,
+`plant`, `remote`, `schedule`, `script`, `siren`, `sun`, `switch`,
+`timer`, `update`, `vacuum`.
+
+Since this is a huge, open-ended combination space, it isn't practical as
+fixed fields - use the **Custom Variables** section's quick-add helper
+instead: pick a domain, optionally a device class, type the state, pick a
+color. It builds the key for you and adds it straight to your theme's
+Variables export, same as any other field.
+
+The same section's free-form "Add any variable" field works for anything
+else not covered by this card's built-in fields - Home Assistant's own
+docs note that some theme variables can change behavior between releases
+([see color.globals.ts](https://github.com/home-assistant/frontend/blob/master/src/resources/theme/color/color.globals.ts)
+for the current authoritative list), so this is also your escape hatch if
+a future HA version adds something new before this card catches up.
 
 ## What each tab actually is
 
@@ -61,7 +96,7 @@ A few things worth knowing about this merge:
   `card-mod-view`, ...) sits at the same 2-space indent directly under
   `my_theme:`. The multi-line `card-mod-card: |` and `card-mod-view: |`
   blocks use the `|` (literal block) YAML syntax - keep their contents
-  indented one level deeper than the key itself, exactly as the drawer
+  indented one level deeper than the key itself, exactly as the popup
   generates them.
 - **`card-mod-theme: "my_theme"` must match your actual theme name.** If
   you rename the theme after copying the Card Shape tab, update this line
@@ -133,6 +168,30 @@ card_mod:
 class names inside the generated YAML).
 
 ## Troubleshooting
+
+**Input field colors (search boxes, dropdowns, form fields) only partially apply.**
+Home Assistant migrated parts of its input styling to Material Design 3
+in the 2026.4 release, which introduced a new `md-sys-color-*` variable
+set alongside the older `input-*`/`mdc-*` one - which set actually takes
+effect depends on your HA version and which specific component you're
+looking at. The Input Fields section includes both sets for this reason;
+if changing one set doesn't visibly do anything, try the other. This is
+an area Home Assistant itself has changed more than once, so don't be
+surprised if it needs revisiting after a future HA update.
+
+**Native Home Assistant dialogs (like HACS's own download screen) look
+slightly off - dropdowns, fonts, spacing.**
+This isn't a card bug. The `paper-font-*` variables in the Typography
+section are **global HA theme variables** - they affect the entire Home
+Assistant frontend, not just cards, since Home Assistant itself uses them.
+Native Material components (like the `mwc-select` dropdown in HACS's
+dialogs) aren't guaranteed to gracefully handle every font-size
+combination, so occasional visual mismatches in rarely-seen native
+screens are an inherent trade-off of any custom HA theme, not specific to
+this card. Staying close to HA's defaults (Body 14px, Subhead 16px,
+Headline 24px, Title 21px, Caption 12px) minimizes it; switching back to
+"Default" under Profile → Theme while doing admin tasks like HACS updates
+avoids it entirely.
 
 **Nothing changed after selecting the theme.**
 Confirm you restarted HA (step 4 above) - a reload isn't enough for theme

@@ -132,6 +132,10 @@ Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 > there are written to the `modes:` block, everything else keeps
 > inheriting the base value.
 
+> **Full walkthrough:** see [YAML-GUIDE.md](YAML-GUIDE.md) for how to
+> combine all three YAML-drawer tabs into one theme file, per-card and
+> per-view overrides, and troubleshooting.
+
 ## Why no direct "save to server"?
 
 Browser-side Lovelace cards have no filesystem access to your Home Assistant

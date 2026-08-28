@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.1";
+const CARD_VERSION = "2.0.2";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -2206,6 +2206,7 @@ class ThemeEditorCard extends HTMLElement {
             ${tabs.map((t) => `<button data-yaml-tab="${t.id}" class="${this._yamlTab === t.id ? "on" : ""}">${t.label}</button>`).join("")}
           </div>
           <div class="te-spacer"></div>
+          <a class="te-yaml-guide-link" href="https://github.com/Okcuoglu/homeassistant-theme-editor/blob/main/YAML-GUIDE.md" target="_blank" rel="noopener">How do I use this? ↗</a>
           <button class="te-btn te-btn-small" id="yaml-copy">Copy</button>
           <button class="te-btn te-btn-small" id="yaml-download">Load .yaml</button>
           <button class="te-btn te-btn-icon" id="yaml-close">✕</button>
@@ -2961,6 +2962,8 @@ class ThemeEditorCard extends HTMLElement {
       /* ---------- YAML drawer ---------- */
       .te-yaml-drawer { height: 260px; flex-shrink: 0; background: #0b1216; border-top: 1px solid var(--te-border-str); display: flex; flex-direction: column; }
       .te-yaml-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #1a252b; flex-shrink: 0; }
+      .te-yaml-guide-link { font-size: 11.5px; color: var(--te-accent); text-decoration: none; white-space: nowrap; }
+      .te-yaml-guide-link:hover { text-decoration: underline; }
       .te-yaml-code { margin: 0; flex: 1; overflow: auto; padding: 12px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8; white-space: pre; }
 
       /* ---------- Dialogs ---------- */

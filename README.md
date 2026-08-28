@@ -4,62 +4,81 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Lovelace custom card that lets you **design a Home Assistant theme visually**,
-right inside your dashboard - color pickers, layout controls, a live mockup
-preview, and one-click YAML export. No manual `themes.yaml` fiddling to get
-started, no restart needed to try ideas.
+right inside your dashboard - color pickers, shape and animation controls, a
+live device-frame preview, and one-click YAML export. No manual `themes.yaml`
+fiddling to get started, no restart needed to try ideas.
+
+## v2.0.0: workspace layout
+
+The editor is now a three-zone workspace instead of one long scrolling
+column of accordions:
+
+- **Topbar** - theme name, Base/Light/Dark mode, Presets, Import, Reset,
+  an unsaved-changes counter, a YAML toggle, and Save.
+- **Section navigation** (left, fixed width) - one entry per category,
+  **Advanced** (shapes/animations/backgrounds) first, then the eleven color
+  and sizing groups. Exactly one section is visible at a time - no more
+  hunting through open/closed accordions.
+- **Live preview** (right, fixed width) - stays in view while you scroll
+  the content column, so you can watch a color change land without
+  scrolling back and forth. Switch between Phone / Tablet / Wall Panel
+  widths, jump to a full-card gallery, or open the shape comparison from
+  its footer.
+- **YAML drawer** (bottom, toggleable) - three tabs (Variables / Card Shape
+  / Background) replace three separate copy buttons that used to be
+  scattered through the page.
 
 ## Features
 
-- 🎨 **~47 theme variables** grouped into collapsible categories (primary
-  colors, backgrounds, text, sidebar, cards & shape, typography, status
-  colors, switches, sliders, dividers, dialogs, label badges)
+- 🎨 **61 theme variables** across 11 sections (primary colors,
+  backgrounds, text, sidebar, cards & shape, typography, status colors,
+  switches, slider & lines, dialogs, label badges)
 - 🌗 **Light/Dark mode editing** - edit shared base values once, then switch
   to Light or Dark to add mode-specific overrides, with a one-click "copy
   from other mode" starting point
-- 👀 **Live mockup preview** - a self-contained sample dashboard (sidebar,
-  cards, toggle, slider, badges) that updates instantly as you edit, without
-  touching your real dashboard
+- 👀 **Live preview** in a device frame (Phone 300px / Tablet 380px /
+  Wall Panel 400px) that updates instantly as you edit, without touching
+  your real dashboard
 - 📚 **15 built-in starter presets** across a wide range of moods - from
   clean minimalism to warm materials to retro-technical - to load as a
   jumping-off point
-- 🎨 **Advanced (card-mod)** - inline, collapsible, right below the
-  preview (no popup) - now with real *shape* variety, not just color:
+- 🎨 **Advanced section** - real *shape* variety, not just color:
   - **8 card shapes**: Elevated, Flat, Outlined, Glass/Holo, Angular
     (clipped corners), Chamfered (octagon corners), Pill (fully rounded),
-    Neon Outline (glowing border)
+    Neon Outline (glowing border) - shown as live tiles, click to select
   - **4 toggle/switch shapes**: Default, Rounded square, Sharp, Neon glow
     track - reflected live in the preview; the real-switch card-mod snippet
     is best-effort since exact selectors vary by HA version (clearly
     labeled in the generated YAML)
-  - **4 independent, combinable animations**: Glow pulse, Shimmer sweep,
-    Rotating gradient border, Press flash (ripple approximation) - layer
-    any combination on top of any shape
+  - **5 independent, combinable animations**: Hover elevate, Glow pulse,
+    Shimmer sweep, Rotating gradient border, Press flash (ripple
+    approximation) - layer any combination on top of any shape
   - **Compare Shapes gallery** - see all 8 shapes side by side with your
     current colors/animations applied, click any card to copy its
     `card_mod: class: ...` snippet
-  - Everything updates live in the preview above it, using the exact same
-    CSS that gets exported
-- 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
-  phone-width layout, not just desktop
+- 🌌 **11 dashboard background animations** - a different card-mod
+  injection point (`card-mod-view`, styling the whole view behind every
+  card, not individual cards), shown as live-animated tiles right in the
+  Advanced section (Phosphor Sweep, Raster Pulse, Dust in Light, Blueprint
+  Grid, Circuit Trace, Interference, Reactor Ring, Crosshair, Azimuth,
+  Window Light, Linen Weave). Slow, transform/opacity-driven for
+  performance on weaker displays (e.g. a wall-mounted tablet), colors only
+  via theme variables
 - 🖼️ **Full Preview** - a snapshot popup showing 11 common Home Assistant
   card types (light, thermostat, weather, media player, history graph,
   entities list, alarm panel, camera, button card, gauge, status badges)
-  all styled with your current theme, so you're not limited to the one
-  sample card in the main preview
-- 🌌 **Dashboard Background Animations** - a separate section below the
-  card shapes, since backgrounds use a different card-mod injection point
-  (`card-mod-view`, styling the whole view behind every card, not
-  individual cards). 11 slow, subtle, pure-CSS animations (Phosphor Sweep,
-  Raster Pulse, Dust in Light, Blueprint Grid, Circuit Trace, Interference,
-  Reactor Ring, Crosshair, Azimuth, Window Light, Linen Weave) - all
-  transform/opacity-driven for performance on weaker displays (e.g. a
-  wall-mounted tablet), colors only via theme variables, with a "Compare
-  Backgrounds" gallery to preview all of them at once
+  all styled with your current theme
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
-- 📋 **Export** via clipboard copy or `.yaml` file download
+- 📋 **Export** via clipboard copy or `.yaml` file download, per YAML-drawer
+  tab (variables / card shape / background separately)
 - 💾 Autosaves your work-in-progress to browser `localStorage` so a refresh
-  won't lose your edits
+  won't lose your edits, plus an explicit **Save** with an unsaved-changes
+  counter for peace of mind
+- 📐 Responsive down to the HA config-dialog width: full three-zone layout
+  above 1280px, single-column fields with a narrower preview from
+  1024-1279px, and a horizontal section tab bar with a collapsible preview
+  panel below 1024px
 - 🪶 Zero dependencies, plain JS, works with any Lovelace dashboard
 
 ## Installation
@@ -93,9 +112,11 @@ type: custom:theme-editor-card
 
 Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 
-1. Give your theme a name at the top
-2. Open a category and adjust colors / values - the preview updates live
-3. When you're happy, hit **Copy YAML** or **Download .yaml**
+1. Give your theme a name in the topbar
+2. Pick a section from the left nav and adjust values - the preview updates
+   live on the right
+3. Open the **YAML** drawer (topbar button) and pick the Variables / Card
+   Shape / Background tab you need, then **Copy** or **Load .yaml**
 4. Paste/save the result into `/config/themes/<your_theme>.yaml`
 5. Make sure your `configuration.yaml` includes:
    ```yaml
@@ -105,18 +126,20 @@ Or via the UI: **Edit Dashboard → Add Card → search "Theme Editor Card"**.
 6. Restart Home Assistant, then select your theme under
    **Profile → Theme**
 
-> **Tip:** the "Base (Both)" tab holds mode-independent values. Switch to
-> "Light" or "Dark" to add overrides just for that mode - only fields you
-> actually touch there are written to the `modes:` block, everything else
-> keeps inheriting the base value.
+> **Tip:** the mode segmented control in the topbar (Base / Light / Dark)
+> holds mode-independent values under "Base". Switch to "Light" or "Dark"
+> to add overrides just for that mode - only fields you actually touch
+> there are written to the `modes:` block, everything else keeps
+> inheriting the base value.
 
 ## Why no direct "save to server"?
 
 Browser-side Lovelace cards have no filesystem access to your Home Assistant
-config - that's a deliberate security boundary in HA's frontend. This card
-gives you the fastest path to a finished, correct theme file; getting it onto
-disk still takes one manual copy-paste (or file download + move), the same as
-installing any hand-written theme.
+config - that's a deliberate security boundary in HA's frontend. The
+in-card **Save** button writes your work-in-progress to browser storage so
+it survives a refresh; getting the finished YAML onto disk still takes one
+manual copy-paste (or file download + move), the same as installing any
+hand-written theme.
 
 ## Contributing
 

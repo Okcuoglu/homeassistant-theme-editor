@@ -1,17 +1,20 @@
 /**
  * Theme Editor Card
  * A full-featured Home Assistant theme editor Lovelace card.
- * Live mockup preview, import/export, category groups, localStorage autosave.
+ * v2.0.0: three-zone workspace (topbar / section nav + content + live
+ * preview / YAML drawer), replacing the single scrolling accordion column.
+ * Layout redesign handed off via Claude Design; see the project's design
+ * handoff notes for the original spec (chrome palette, sizing, breakpoints).
  *
  * https://github.com/Okcuoglu/homeassistant-theme-editor
  * License: MIT
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.9.0";
+const CARD_VERSION = "2.0.0";
 
 /* ---------------------------------------------------------------------- */
-/* Built-in starter presets (library)                                     */
+/* Variable schema                                                        */
 /* ---------------------------------------------------------------------- */
 
 const PRESETS = [
@@ -861,6 +864,7 @@ const FIELD_GROUPS = [
   {
     id: "primary",
     label: "Primary Colors",
+    hint: "The four lead colors. They drive accents, icons, and active states across the whole dashboard.",
     fields: [
       { key: "primary-color", label: "Primary color", type: "color", default: "#03a9f4" },
       { key: "accent-color", label: "Accent color", type: "color", default: "#ff9800" },
@@ -871,6 +875,7 @@ const FIELD_GROUPS = [
   {
     id: "backgrounds",
     label: "Backgrounds",
+    hint: "Surfaces for the view, cards, and header. The contrast between card and view controls readability.",
     fields: [
       { key: "primary-background-color", label: "Primary background", type: "color", default: "#111111" },
       { key: "secondary-background-color", label: "Secondary background", type: "color", default: "#1c1c1c" },
@@ -882,6 +887,7 @@ const FIELD_GROUPS = [
   {
     id: "text",
     label: "Text",
+    hint: "Text colors in descending importance.",
     fields: [
       { key: "primary-text-color", label: "Primary text", type: "color", default: "#ffffff" },
       { key: "secondary-text-color", label: "Secondary text", type: "color", default: "#a3a3a3" },
@@ -893,6 +899,7 @@ const FIELD_GROUPS = [
   {
     id: "sidebar",
     label: "Sidebar",
+    hint: "Its own palette for the navigation rail, independent from the cards.",
     fields: [
       { key: "sidebar-icon-color", label: "Icon color", type: "color", default: "#a3a3a3" },
       { key: "sidebar-text-color", label: "Text color", type: "color", default: "#ffffff" },
@@ -905,6 +912,7 @@ const FIELD_GROUPS = [
   {
     id: "cards",
     label: "Cards & Shape",
+    hint: "Radii, borders, and spacing. Values in px.",
     fields: [
       { key: "ha-card-border-radius", label: "Card border radius", type: "text", unit: "px", default: "12px" },
       { key: "ha-card-border-width", label: "Card border width", type: "text", unit: "px", default: "1px" },
@@ -920,6 +928,7 @@ const FIELD_GROUPS = [
   {
     id: "typography",
     label: "Typography",
+    hint: "Paper-style font sizes. Don't go under 14px on wall panels.",
     fields: [
       { key: "paper-font-body1_-_font-size", label: "Body font size", type: "text", unit: "px", default: "14px" },
       { key: "paper-font-subhead_-_font-size", label: "Subhead font size", type: "text", unit: "px", default: "16px" },
@@ -931,6 +940,7 @@ const FIELD_GROUPS = [
   {
     id: "status",
     label: "Status Colors",
+    hint: "States of entities and messages.",
     fields: [
       { key: "state-icon-color", label: "State icon", type: "color", default: "#a3a3a3" },
       { key: "state-icon-active-color", label: "State icon active", type: "color", default: "#03a9f4" },
@@ -944,6 +954,7 @@ const FIELD_GROUPS = [
   {
     id: "switches",
     label: "Switches & Toggles",
+    hint: "Toggle switches in two states, per knob and track.",
     fields: [
       { key: "switch-checked-color", label: "Checked", type: "color", default: "#03a9f4" },
       { key: "switch-unchecked-color", label: "Unchecked", type: "color", default: "#5c5c5c" },
@@ -955,17 +966,12 @@ const FIELD_GROUPS = [
   },
   {
     id: "slider",
-    label: "Slider",
+    label: "Slider & Lines",
+    hint: "Sliders, dividers, and outlines.",
     fields: [
       { key: "slider-color", label: "Slider color", type: "color", default: "#03a9f4" },
       { key: "slider-secondary-color", label: "Slider secondary", type: "color", default: "#5c5c5c" },
       { key: "slider-bar-color", label: "Slider bar/track", type: "color", default: "#292929" },
-    ],
-  },
-  {
-    id: "dividers",
-    label: "Dividers & Outlines",
-    fields: [
       { key: "divider-color", label: "Divider", type: "color", default: "#292929" },
       { key: "outline-color", label: "Outline", type: "color", default: "#3a3a3a" },
     ],
@@ -973,6 +979,7 @@ const FIELD_GROUPS = [
   {
     id: "material",
     label: "Dialogs / Material Surfaces",
+    hint: "Material surfaces in dialogs and menus.",
     fields: [
       { key: "mdc-theme-surface", label: "Surface", type: "color", default: "#1e1e1e" },
       { key: "material-body-text-color", label: "Body text", type: "color", default: "#ffffff" },
@@ -983,6 +990,7 @@ const FIELD_GROUPS = [
   {
     id: "badges",
     label: "Label Badges",
+    hint: "Five fixed badge colors.",
     fields: [
       { key: "label-badge-red", label: "Red", type: "color", default: "#db4437" },
       { key: "label-badge-green", label: "Green", type: "color", default: "#43a047" },
@@ -992,7 +1000,6 @@ const FIELD_GROUPS = [
     ],
   },
 ];
-
 const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
 
 /* ---------------------------------------------------------------------- */
@@ -1518,10 +1525,9 @@ function buildBackgroundYaml(backgroundId) {
 
 
 const DEFAULT_ADVANCED_STATE = {
-  hoverElevate: true,
   variant: "elevated",
   toggleStyle: "default",
-  animations: { glowPulse: false, shimmer: false, rotatingBorder: false, ripple: false },
+  animations: { hoverElevate: true, glowPulse: false, shimmer: false, rotatingBorder: false, ripple: false },
   transitionMs: 200,
   background: "none",
 };
@@ -1540,10 +1546,16 @@ const ROTATE_BORDER_KEYFRAMES = `@keyframes theme-editor-rotate-border {
     }`;
 
 // Builds the animation-related CSS blocks (keyframes + rules) for a given
-// selector. Animations are independent of the card variant/shape now, so
-// any combination (e.g. Pill + Shimmer + Rotating Border) can be layered.
+// selector. All five (including hover-elevate, folded in here as of v2.0.0
+// so every combinable animation lives in one place/one checkbox grid) are
+// independent of the card variant/shape, so any combination can be layered.
 function buildAnimationBlocks(selector, animations) {
   const blocks = [];
+  if (animations.hoverElevate) {
+    blocks.push(
+      `${selector}:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,0,0,0.4); }`
+    );
+  }
   if (animations.glowPulse) {
     blocks.push(HOLO_PULSE_KEYFRAMES);
     blocks.push(`${selector} { animation: theme-editor-holo-pulse 3s ease-in-out infinite; }`);
@@ -1585,12 +1597,6 @@ function buildCardModSnippet(themeName, opts) {
   lines.push(`    ha-card {`);
   lines.push(`      transition: transform ${ms}ms ease, box-shadow ${ms}ms ease;${globalVariantBlock}`);
   lines.push(`    }`);
-  if (opts.hoverElevate) {
-    lines.push(`    ha-card:hover {`);
-    lines.push(`      transform: translateY(-3px);`);
-    lines.push(`      box-shadow: 0 10px 24px rgba(0,0,0,0.4);`);
-    lines.push(`    }`);
-  }
   for (const block of buildAnimationBlocks("ha-card", animations)) {
     lines.push(`    ${block}`);
   }
@@ -1615,8 +1621,8 @@ function buildCardModSnippet(themeName, opts) {
 }
 
 // Builds plain CSS (not YAML) for the live mockup preview, targeting
-// .mockup-card instead of ha-card, using the exact same variant/hover/
-// transition/animation logic as buildCardModSnippet.
+// .mockup-card instead of ha-card, using the exact same variant/animation
+// logic as buildCardModSnippet.
 function buildPreviewAdvancedCss(advanced) {
   const ms = advanced.transitionMs || 200;
   const animations = advanced.animations || {};
@@ -1627,13 +1633,6 @@ function buildPreviewAdvancedCss(advanced) {
       ${variantDecl}
     }
   `;
-  if (advanced.hoverElevate) {
-    css += `
-    .mockup-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.4);
-    }`;
-  }
   css += "\n" + buildAnimationBlocks(".mockup-card", animations).join("\n");
 
   const toggle = TOGGLE_STYLE_DECLS[advanced.toggleStyle] || TOGGLE_STYLE_DECLS.default;
@@ -1706,6 +1705,19 @@ function parseYaml(text) {
 /* Card element                                                           */
 /* ---------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------- */
+/* Section navigation (Advanced first, then one entry per FIELD_GROUPS)   */
+/* ---------------------------------------------------------------------- */
+
+const SECTIONS = [
+  { id: "advanced", label: "Advanced", isAdvanced: true },
+  ...FIELD_GROUPS.map((g) => ({ id: g.id, label: g.label, hint: g.hint, fields: g.fields })),
+];
+
+/* ---------------------------------------------------------------------- */
+/* Card element                                                           */
+/* ---------------------------------------------------------------------- */
+
 class ThemeEditorCard extends HTMLElement {
   constructor() {
     super();
@@ -1713,11 +1725,14 @@ class ThemeEditorCard extends HTMLElement {
     this._values = {};
     this._modeValues = { light: {}, dark: {} };
     this._activeMode = null; // null = base (both modes), or "light" / "dark"
-    this._previewDevice = "desktop"; // "desktop" | "mobile"
+    this._previewDevice = "tablet"; // "mobile" (300) | "tablet" (380) | "wallpanel" (400)
     this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
-    this._advancedOpen = false;
     this._themeName = "my_custom_theme";
-    this._openGroups = new Set([FIELD_GROUPS[0].id]);
+    this._activeSection = "advanced";
+    this._showYaml = false;
+    this._yamlTab = "vars"; // "vars" | "card" | "background"
+    this._dirtyCount = 0;
+    this._navMobileOpen = false; // <1024px: preview becomes a collapsible panel
   }
 
   // Returns the values object currently being edited: base, or the active mode's overrides.
@@ -1732,7 +1747,7 @@ class ThemeEditorCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 12;
+    return 16;
   }
 
   connectedCallback() {
@@ -1749,13 +1764,22 @@ class ThemeEditorCard extends HTMLElement {
         this._values = parsed.values || {};
         this._modeValues = parsed.modeValues || { light: {}, dark: {} };
         this._themeName = parsed.themeName || "my_custom_theme";
-        this._previewDevice = parsed.previewDevice || "desktop";
-        // Merge with defaults so older localStorage snapshots (before toggleStyle/
-        // animations existed) don't crash on missing fields.
+        this._previewDevice = parsed.previewDevice || "tablet";
+        this._activeSection = parsed.activeSection || "advanced";
+        // Merge with defaults so older localStorage snapshots (pre-v2, or
+        // pre-toggleStyle/animations) don't crash on missing fields. Also
+        // migrates a legacy top-level `hoverElevate` flag (v1.x) into the
+        // v2.0.0 animations object if present.
+        const savedAdvanced = parsed.advanced || {};
+        const savedAnimations = savedAdvanced.animations || {};
         this._advanced = {
           ...DEFAULT_ADVANCED_STATE,
-          ...(parsed.advanced || {}),
-          animations: { ...DEFAULT_ADVANCED_STATE.animations, ...((parsed.advanced && parsed.advanced.animations) || {}) },
+          ...savedAdvanced,
+          animations: {
+            ...DEFAULT_ADVANCED_STATE.animations,
+            ...(savedAdvanced.hoverElevate !== undefined ? { hoverElevate: savedAdvanced.hoverElevate } : {}),
+            ...savedAnimations,
+          },
         };
       }
     } catch (e) {
@@ -1772,6 +1796,7 @@ class ThemeEditorCard extends HTMLElement {
           modeValues: this._modeValues,
           themeName: this._themeName,
           previewDevice: this._previewDevice,
+          activeSection: this._activeSection,
           advanced: this._advanced,
         })
       );
@@ -1780,178 +1805,18 @@ class ThemeEditorCard extends HTMLElement {
     }
   }
 
-  /* ---------------- rendering ---------------- */
-
-  _render() {
-    const root = this.shadowRoot;
-    root.innerHTML = `
-      <style>${this._css()}</style>
-      <ha-card>
-        <div class="header">
-          <div class="header-title">
-            <ha-icon-placeholder></ha-icon-placeholder>
-            <span>Theme Editor</span>
-          </div>
-          <div class="header-actions">
-            <button class="btn-flat" id="btn-presets">Presets</button>
-            <button class="btn-flat" id="btn-import">Import</button>
-            <button class="btn-flat" id="btn-reset">Reset</button>
-          </div>
-        </div>
-
-        <div class="theme-name-row">
-          <label for="theme-name">Theme name</label>
-          <input id="theme-name" type="text" value="${this._escAttr(this._themeName)}" placeholder="my_custom_theme" />
-        </div>
-
-        <div class="mode-bar">
-          <div class="mode-toggle">
-            <button class="mode-btn ${!this._activeMode ? "active" : ""}" data-mode="">Base (Both)</button>
-            <button class="mode-btn ${this._activeMode === "light" ? "active" : ""}" data-mode="light">Light</button>
-            <button class="mode-btn ${this._activeMode === "dark" ? "active" : ""}" data-mode="dark">Dark</button>
-          </div>
-          ${
-            this._activeMode
-              ? `<button class="btn-flat" id="btn-copy-mode">Copy from ${this._activeMode === "light" ? "Dark" : "Light"}</button>`
-              : ""
-          }
-        </div>
-        ${
-          this._activeMode
-            ? `<div class="mode-hint">Editing <strong>${this._activeMode}</strong> mode overrides. Empty fields inherit the Base value shown as placeholder. Click ✕ to clear an override.</div>`
-            : ""
-        }
-
-        <div class="preview-toolbar">
-          <span class="preview-label">Preview</span>
-          <div class="preview-toolbar-actions">
-            <button class="btn-flat btn-small" id="btn-full-preview">Full Preview</button>
-            <div class="device-toggle">
-              <button class="device-btn ${this._previewDevice === "desktop" ? "active" : ""}" data-device="desktop" title="Desktop preview">🖥</button>
-              <button class="device-btn ${this._previewDevice === "mobile" ? "active" : ""}" data-device="mobile" title="Mobile preview">📱</button>
-            </div>
-          </div>
-        </div>
-        <div class="preview-wrap ${this._previewDevice === "mobile" ? "mobile" : ""}" id="preview-wrap">
-          ${this._previewHtml()}
-        </div>
-
-        <div class="group advanced-group ${this._advancedOpen ? "open" : ""}">
-          <button class="group-header" data-toggle-advanced>
-            <span class="chevron">${this._advancedOpen ? "▾" : "▸"}</span>
-            <span>Advanced (card-mod)</span>
-          </button>
-          <div class="group-body advanced-body" ${this._advancedOpen ? "" : 'style="display:none"'}>
-            ${this._advancedBodyHtml()}
-          </div>
-        </div>
-
-        <div class="groups" id="groups">
-          ${FIELD_GROUPS.map((g) => this._groupHtml(g)).join("")}
-        </div>
-
-        <div class="export-row">
-          <button class="btn" id="btn-copy">Copy YAML</button>
-          <button class="btn" id="btn-download">Download .yaml</button>
-        </div>
-        <div class="hint" id="copy-hint"></div>
-      </ha-card>
-    `;
-    this._applyPreviewVars();
-    this._applyAdvancedPreview();
-    this._applyBackgroundPreview();
-    this._bindEvents();
-    this._bindAdvancedControls();
-  }
-
-  _groupHtml(group) {
-    const isOpen = this._openGroups.has(group.id);
-    return `
-      <div class="group ${isOpen ? "open" : ""}" data-group="${group.id}">
-        <button class="group-header" data-toggle="${group.id}">
-          <span class="chevron">${isOpen ? "▾" : "▸"}</span>
-          <span>${group.label}</span>
-        </button>
-        <div class="group-body" ${isOpen ? "" : 'style="display:none"'}>
-          ${group.fields.map((f) => this._fieldHtml(f)).join("")}
-        </div>
-      </div>
-    `;
-  }
-
-  _fieldHtml(field) {
-    const store = this._activeStore();
-    const val = store[field.key] ?? "";
-    const isOverride = !!this._activeMode && val !== "";
-    // In mode-edit context, an empty field inherits the base value - show it as the placeholder / swatch.
-    const inheritedDisplay = this._activeMode ? this._values[field.key] || field.default : field.default;
-    const clearBtn = `<button class="btn-clear ${isOverride ? "" : "hidden"}" data-clear="${field.key}" title="Clear override, inherit base">✕</button>`;
-
-    if (field.type === "color") {
-      const swatchVal = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val)
-        ? val
-        : /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(inheritedDisplay)
-        ? inheritedDisplay
-        : field.default;
-      return `
-        <div class="field">
-          <label>${field.label}</label>
-          <div class="field-input">
-            <input type="color" data-key="${field.key}" value="${swatchVal}" />
-            <input type="text" class="hex-text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
-            ${clearBtn}
-          </div>
-        </div>
-      `;
+  _markDirty() {
+    this._dirtyCount++;
+    this._saveToStorage();
+    const el = this.shadowRoot.getElementById("dirty-counter");
+    if (el) {
+      el.textContent = this._dirtyCount === 1 ? "1 unsaved change" : `${this._dirtyCount} unsaved changes`;
+      el.style.display = "";
     }
-    return `
-      <div class="field">
-        <label>${field.label}</label>
-        <div class="field-input">
-          <input type="text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
-          ${clearBtn}
-        </div>
-      </div>
-    `;
   }
 
-  _previewHtml() {
-    return `
-      <div class="mockup">
-        <div class="mockup-header">
-          <span class="mockup-title">Preview</span>
-        </div>
-        <div class="mockup-body">
-          <div class="mockup-sidebar">
-            <div class="mockup-side-item active"><span class="dot"></span>Overview</div>
-            <div class="mockup-side-item"><span class="dot"></span>Rooms</div>
-            <div class="mockup-side-item"><span class="dot"></span>Settings</div>
-          </div>
-          <div class="mockup-main">
-            <div class="mockup-card">
-              <div class="mockup-card-title">Living Room Light</div>
-              <div class="mockup-row">
-                <span class="mockup-label">On/Off</span>
-                <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
-              </div>
-              <div class="mockup-slider"><span class="mockup-slider-fill"></span></div>
-            </div>
-            <div class="mockup-card">
-              <div class="mockup-card-title">Temperature</div>
-              <div class="mockup-big-value">21.4°C</div>
-              <span class="mockup-badge success">Normal</span>
-              <span class="mockup-badge warning">Warning</span>
-              <span class="mockup-badge error">Error</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
+  /* ---------------- shared var helpers ---------------- */
 
-  // Returns only the CSS vars the theme actually defines (base + active mode
-  // override) - unset fields are omitted so real fallback chains can apply,
-  // same as real Home Assistant only injects vars a theme specifies.
   _computeEffectiveVars() {
     const modeOverrides = this._activeMode ? this._modeValues[this._activeMode] : {};
     const result = {};
@@ -1970,48 +1835,388 @@ class ThemeEditorCard extends HTMLElement {
   }
 
   _applyPreviewVars() {
-    const wrap = this.shadowRoot.getElementById("preview-wrap");
-    if (!wrap) return;
-    this._applyVarsToElement(wrap, this._computeEffectiveVars());
+    const frame = this.shadowRoot.getElementById("preview-frame");
+    if (!frame) return;
+    this._applyVarsToElement(frame, this._computeEffectiveVars());
   }
 
-  // Injects a <style> tag into the preview so card-mod's hover/variant/
-  // transition settings are visible live, without touching the real dashboard.
   _applyAdvancedPreview() {
-    const wrap = this.shadowRoot.getElementById("preview-wrap");
-    if (!wrap) return;
-    let styleEl = wrap.querySelector("#adv-preview-style");
+    const frame = this.shadowRoot.getElementById("preview-frame");
+    if (!frame) return;
+    let styleEl = frame.querySelector(".adv-preview-style");
     if (!styleEl) {
       styleEl = document.createElement("style");
-      styleEl.id = "adv-preview-style";
-      wrap.appendChild(styleEl);
+      styleEl.className = "adv-preview-style";
+      frame.appendChild(styleEl);
     }
     styleEl.textContent = buildPreviewAdvancedCss(this._advanced);
   }
 
-  // Applies the selected background animation's class + CSS to the preview
-  // container itself (which is the containing block for position:fixed,
-  // per the transform on .preview-wrap - see its CSS comment).
-  _applyBackgroundPreview() {
-    const wrap = this.shadowRoot.getElementById("preview-wrap");
-    if (!wrap) return;
-    for (const cls of [...wrap.classList]) {
-      if (cls.startsWith("theme-editor-bg-")) wrap.classList.remove(cls);
+  _applyBackgroundPreview(target) {
+    const el = target || this.shadowRoot.getElementById("preview-frame");
+    if (!el) return;
+    for (const cls of [...el.classList]) {
+      if (cls.startsWith("theme-editor-bg-")) el.classList.remove(cls);
     }
-    let styleEl = wrap.querySelector("#bg-preview-style");
+    let styleEl = el.querySelector(".bg-preview-style");
     const bgId = this._advanced.background;
     const css = bgId && BACKGROUND_ANIMATION_CSS[bgId];
     if (!css) {
       if (styleEl) styleEl.textContent = "";
       return;
     }
-    wrap.classList.add(`theme-editor-bg-${bgId}`);
+    el.classList.add(`theme-editor-bg-${bgId}`);
     if (!styleEl) {
       styleEl = document.createElement("style");
-      styleEl.id = "bg-preview-style";
-      wrap.appendChild(styleEl);
+      styleEl.className = "bg-preview-style";
+      el.appendChild(styleEl);
     }
     styleEl.textContent = css;
+  }
+
+  _escAttr(str) {
+    return String(str).replace(/"/g, "&quot;");
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  _render() {
+    const root = this.shadowRoot;
+    root.innerHTML = `
+      <style>${this._css()}</style>
+      <ha-card>
+        <div class="te-root">
+          ${this._topbarHtml()}
+          <div class="te-workspace">
+            ${this._navHtml()}
+            <div class="te-content" id="te-content">
+              <button class="te-preview-toggle" id="te-preview-toggle">${this._navMobileOpen ? "▴ Hide preview" : "▾ Show preview"}</button>
+              ${this._contentHtml()}
+            </div>
+            ${this._previewColumnHtml()}
+          </div>
+          ${this._showYaml ? this._yamlDrawerHtml() : ""}
+        </div>
+      </ha-card>
+    `;
+    this._applyPreviewVars();
+    this._applyAdvancedPreview();
+    this._applyBackgroundPreview();
+    this._bindEvents();
+  }
+
+  _topbarHtml() {
+    const modes = [
+      { id: null, label: "Both" },
+      { id: "light", label: "Light" },
+      { id: "dark", label: "Dark" },
+    ];
+    return `
+      <div class="te-topbar">
+        <div class="te-brand">Theme Editor</div>
+        <div class="te-vdiv"></div>
+        <div class="te-name-field">
+          <span class="te-label-inline">Name</span>
+          <input id="theme-name" type="text" value="${this._escAttr(this._themeName)}" placeholder="my_custom_theme" />
+        </div>
+        <div class="te-seg" id="mode-seg">
+          ${modes
+            .map(
+              (m) => `<button data-mode="${m.id || ""}" class="${this._activeMode === m.id ? "on" : ""}">${m.label}</button>`
+            )
+            .join("")}
+        </div>
+        <div class="te-spacer"></div>
+        <span class="te-dirty" id="dirty-counter" style="${this._dirtyCount ? "" : "display:none"}">${
+      this._dirtyCount === 1 ? "1 unsaved change" : `${this._dirtyCount} unsaved changes`
+    }</span>
+        <button class="te-btn" id="btn-presets">Presets</button>
+        <button class="te-btn" id="btn-import">Import</button>
+        <button class="te-btn te-btn-danger" id="btn-reset">Reset</button>
+        <div class="te-vdiv"></div>
+        <button class="te-btn te-btn-accent" id="btn-yaml-toggle">YAML</button>
+        <button class="te-btn te-btn-primary" id="btn-save">Save</button>
+      </div>
+    `;
+  }
+
+  _navHtml() {
+    return `
+      <div class="te-nav">
+        <div class="te-nav-label">Sections</div>
+        ${SECTIONS.map((s) => {
+          const on = s.id === this._activeSection;
+          const count = s.isAdvanced ? "card-mod" : String(s.fields.length);
+          return `
+            <button class="te-nav-row ${on ? "on" : ""}" data-section="${s.id}">
+              <span class="te-nav-marker"></span>
+              <span class="te-nav-label-text">${s.label}</span>
+              <span class="te-nav-count">${count}</span>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
+
+  _contentHtml() {
+    const s = SECTIONS.find((x) => x.id === this._activeSection) || SECTIONS[0];
+    const count = s.isAdvanced ? "3 groups" : `${s.fields.length} fields`;
+    const hint = s.isAdvanced
+      ? "Shapes, animations, and backgrounds need card-mod. Changes apply instantly in the preview to the right; the YAML lives in the drawer below."
+      : s.hint;
+    return `
+      <div class="te-content-inner">
+        <div class="te-content-head">
+          <h2>${s.label}</h2>
+          <span class="te-content-count">${count}</span>
+        </div>
+        <div class="te-content-hint">${hint}</div>
+        ${s.isAdvanced ? this._advancedContentHtml() : this._fieldsGridHtml(s.fields)}
+      </div>
+    `;
+  }
+
+  _fieldsGridHtml(fields) {
+    const store = this._activeStore();
+    return `
+      <div class="te-field-grid">
+        ${fields.map((f) => this._fieldRowHtml(f, store)).join("")}
+      </div>
+    `;
+  }
+
+  _fieldRowHtml(field, store) {
+    const val = store[field.key] ?? "";
+    const isOverride = !!this._activeMode && val !== "";
+    const inheritedDisplay = this._activeMode ? this._values[field.key] || field.default : field.default;
+    const clearBtn = `<button class="te-field-clear ${isOverride ? "" : "hidden"}" data-clear="${field.key}" title="Clear override, inherit base">✕</button>`;
+
+    if (field.type === "color") {
+      const swatchVal = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(val)
+        ? val
+        : /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(inheritedDisplay)
+        ? inheritedDisplay
+        : field.default;
+      return `
+        <div class="te-field-row">
+          <input type="color" class="te-swatch" data-key="${field.key}" value="${swatchVal}" title="${field.label}" />
+          <div class="te-field-names">
+            <div class="te-field-label">${field.label}</div>
+            <div class="te-field-key">${field.key}</div>
+          </div>
+          <input type="text" class="te-field-hex" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
+          ${clearBtn}
+        </div>
+      `;
+    }
+    return `
+      <div class="te-field-row">
+        <div class="te-swatch te-unit-box">${field.unit || "px"}</div>
+        <div class="te-field-names">
+          <div class="te-field-label">${field.label}</div>
+          <div class="te-field-key">${field.key}</div>
+        </div>
+        <input type="text" class="te-field-hex te-field-text" data-key="${field.key}" value="${this._escAttr(val)}" placeholder="${inheritedDisplay}" />
+        ${clearBtn}
+      </div>
+    `;
+  }
+
+  _advancedContentHtml() {
+    const a = this._advanced;
+    const animList = [
+      { key: "hoverElevate", label: "Hover Elevate" },
+      { key: "glowPulse", label: "Glow Pulse" },
+      { key: "shimmer", label: "Shimmer Sweep" },
+      { key: "rotatingBorder", label: "Rotating Border" },
+      { key: "ripple", label: "Press Flash" },
+    ];
+    return `
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Card Shape</div>
+          <span class="te-adv-block-note">global default</span>
+        </div>
+        <div class="te-shape-grid">
+          ${Object.entries(CARD_VARIANT_LABELS)
+            .filter(([key]) => key !== "none")
+            .map(([key, label]) => {
+              const on = a.variant === key;
+              const decl = CARD_VARIANT_DECLS[key] || "";
+              return `
+                <button class="te-shape-tile ${on ? "on" : ""}" data-shape="${key}">
+                  <div class="te-shape-chip" style="${decl}"></div>
+                  <span>${label.replace(/\s*\(.*\)/, "")}</span>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
+
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Toggle / Switch Shape</div>
+        </div>
+        <div class="te-shape-grid te-shape-grid-4">
+          ${Object.entries(TOGGLE_STYLE_LABELS)
+            .map(([key, label]) => {
+              const on = a.toggleStyle === key;
+              return `
+                <button class="te-shape-tile te-toggle-tile ${on ? "on" : ""}" data-toggle-style="${key}">
+                  <span class="mockup-toggle on toggle-preview-${key}"><span class="knob"></span></span>
+                  <span>${label}</span>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
+
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">Animations</div>
+          <span class="te-adv-block-note">combinable</span>
+        </div>
+        <div class="te-anim-grid">
+          ${animList
+            .map((item) => {
+              const on = !!a.animations[item.key];
+              return `
+                <button class="te-anim-tile ${on ? "on" : ""}" data-anim="${item.key}">
+                  <span class="te-anim-box">${on ? "✓" : ""}</span>
+                  <span>${item.label}</span>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+        <div class="te-transition-row">
+          <span>Transition speed</span>
+          <input type="range" id="adv-ms" min="0" max="600" step="10" value="${a.transitionMs}" />
+          <span class="te-transition-val" id="adv-ms-label">${a.transitionMs} ms</span>
+        </div>
+        <button class="te-btn te-btn-small" id="adv-compare" style="margin-top: 10px;">⇔ Compare shapes</button>
+      </div>
+
+      <div class="te-adv-block">
+        <div class="te-adv-block-head">
+          <div class="te-adv-block-title">View Background</div>
+          <span class="te-adv-block-note">card-mod-view</span>
+        </div>
+        <div class="te-bg-grid">
+          <button class="te-bg-tile ${a.background === "none" ? "on" : ""}" data-bg="none">
+            <div class="te-bg-stage"></div>
+            <span>None</span>
+          </button>
+          ${BACKGROUND_ANIMATIONS.map((b) => {
+            const on = a.background === b.id;
+            return `
+              <button class="te-bg-tile ${on ? "on" : ""}" data-bg="${b.id}">
+                <div class="te-bg-stage theme-editor-bg-${b.id}"></div>
+                <span>${b.name}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  _previewColumnHtml() {
+    const devices = [
+      { id: "mobile", label: "Phone" },
+      { id: "tablet", label: "Tablet" },
+      { id: "wallpanel", label: "Wall Panel" },
+    ];
+    return `
+      <div class="te-preview-col ${this._navMobileOpen ? "open" : ""}" id="te-preview-col">
+        <div class="te-preview-head">
+          <span class="te-preview-label">Live Preview</span>
+          <div class="te-seg" id="device-seg">
+            ${devices.map((d) => `<button data-device="${d.id}" class="${this._previewDevice === d.id ? "on" : ""}">${d.label}</button>`).join("")}
+          </div>
+        </div>
+        <div class="te-preview-body">
+          <div class="te-preview-frame" id="preview-frame" style="width: ${this._deviceWidth()}px;">
+            ${this._previewFrameInnerHtml()}
+          </div>
+        </div>
+        <div class="te-preview-foot">
+          <button class="te-btn" id="btn-full-preview">Fullscreen</button>
+          <button class="te-btn" id="btn-compare-shapes">Compare shapes</button>
+        </div>
+      </div>
+    `;
+  }
+
+  _deviceWidth() {
+    return { mobile: 300, tablet: 380, wallpanel: 400 }[this._previewDevice] || 380;
+  }
+
+  _previewFrameInnerHtml() {
+    return `
+      <div class="pf-header">
+        <div class="pf-header-left"><span class="pf-dot"></span>Overview</div>
+        <span class="pf-header-right">Rooms · Settings</span>
+      </div>
+      <div class="pf-body">
+        <div class="mockup-card">
+          <div class="pf-row">
+            <div>
+              <div class="pf-title">Living Room Light</div>
+              <div class="pf-sub">On · 62%</div>
+            </div>
+            <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
+          </div>
+        </div>
+        <div class="mockup-card">
+          <div class="pf-title">Temperature</div>
+          <div class="pf-big">21.4°C</div>
+          <div class="mockup-slider"><span class="mockup-slider-fill" style="width:62%"></span></div>
+        </div>
+        <div class="pf-badges">
+          <span class="mockup-badge success">Normal</span>
+          <span class="mockup-badge warning">Warning</span>
+          <span class="mockup-badge error">Error</span>
+        </div>
+      </div>
+    `;
+  }
+
+  _yamlDrawerHtml() {
+    const tabs = [
+      { id: "vars", label: "Variables" },
+      { id: "card", label: "Card Shape" },
+      { id: "background", label: "Background" },
+    ];
+    let text;
+    if (this._yamlTab === "card") {
+      text = buildCardModSnippet(this._themeName, this._advanced);
+    } else if (this._yamlTab === "background") {
+      text = buildBackgroundYaml(this._advanced.background) || "# No background animation selected.\n# Pick one under Advanced → View Background.";
+    } else {
+      text = buildYaml(this._themeName, this._values, this._modeValues);
+    }
+    return `
+      <div class="te-yaml-drawer">
+        <div class="te-yaml-head">
+          <div class="te-seg" id="yaml-tab-seg">
+            ${tabs.map((t) => `<button data-yaml-tab="${t.id}" class="${this._yamlTab === t.id ? "on" : ""}">${t.label}</button>`).join("")}
+          </div>
+          <div class="te-spacer"></div>
+          <button class="te-btn te-btn-small" id="yaml-copy">Copy</button>
+          <button class="te-btn te-btn-small" id="yaml-download">Load .yaml</button>
+          <button class="te-btn te-btn-icon" id="yaml-close">✕</button>
+        </div>
+        <pre class="te-yaml-code" id="yaml-code">${this._escHtml(text)}</pre>
+      </div>
+    `;
+  }
+
+  _escHtml(str) {
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   /* ---------------- events ---------------- */
@@ -2019,320 +2224,290 @@ class ThemeEditorCard extends HTMLElement {
   _bindEvents() {
     const root = this.shadowRoot;
 
+    // Topbar
     root.getElementById("theme-name").addEventListener("input", (e) => {
       this._themeName = e.target.value || "my_custom_theme";
-      this._saveToStorage();
+      this._markDirty();
     });
-
-    root.querySelectorAll(".group-header[data-toggle]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.dataset.toggle;
-        if (this._openGroups.has(id)) this._openGroups.delete(id);
-        else this._openGroups.add(id);
-        this._render();
-      });
-    });
-
-    const advToggle = root.querySelector("[data-toggle-advanced]");
-    if (advToggle) {
-      advToggle.addEventListener("click", () => {
-        this._advancedOpen = !this._advancedOpen;
-        this._render();
-      });
-    }
-
-    root.querySelectorAll(".mode-btn").forEach((btn) => {
+    root.querySelectorAll("#mode-seg button").forEach((btn) => {
       btn.addEventListener("click", () => {
         this._activeMode = btn.dataset.mode || null;
         this._render();
       });
     });
-
-    root.querySelectorAll(".device-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this._previewDevice = btn.dataset.device;
-        this._saveToStorage();
-        this._render();
-      });
-    });
-
-    const copyModeBtn = root.getElementById("btn-copy-mode");
-    if (copyModeBtn) {
-      copyModeBtn.addEventListener("click", () => {
-        const other = this._activeMode === "light" ? "dark" : "light";
-        this._modeValues[this._activeMode] = { ...this._modeValues[other] };
-        this._saveToStorage();
-        this._render();
-      });
-    }
-
-    root.querySelectorAll("input[data-key]").forEach((input) => {
-      input.addEventListener("input", (e) => {
-        const key = e.target.dataset.key;
-        const value = e.target.value;
-        const store = this._activeStore();
-        store[key] = value;
-        this._applyPreviewVars();
-        this._saveToStorage();
-        // keep paired color/hex inputs for the same key in sync
-        root.querySelectorAll(`input[data-key="${key}"]`).forEach((other) => {
-          if (other !== e.target) other.value = value;
-        });
-        // toggle the clear (✕) button without a full re-render, so focus/cursor is preserved while typing
-        const clearBtn = e.target.closest(".field-input")?.querySelector(".btn-clear");
-        if (clearBtn) clearBtn.classList.toggle("hidden", !this._activeMode || value === "");
-      });
-    });
-
-    root.querySelectorAll("[data-clear]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const key = btn.dataset.clear;
-        delete this._activeStore()[key];
-        this._applyPreviewVars();
-        this._saveToStorage();
-        this._render();
-      });
-    });
-
+    root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
+    root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
     root.getElementById("btn-reset").addEventListener("click", () => {
       if (!confirm("Reset all fields (base, light, dark, advanced) and start a new blank theme?")) return;
       this._values = {};
       this._modeValues = { light: {}, dark: {} };
       this._activeMode = null;
       this._themeName = "my_custom_theme";
-      this._previewDevice = "desktop";
+      this._previewDevice = "tablet";
       this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
+      this._dirtyCount = 0;
       this._saveToStorage();
       this._render();
     });
-
-    root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
-    root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
-    root.getElementById("btn-full-preview").addEventListener("click", () => this._openFullPreviewDialog());
-
-    root.getElementById("btn-copy").addEventListener("click", async () => {
-      const yaml = buildYaml(this._themeName, this._values, this._modeValues);
-      try {
-        await navigator.clipboard.writeText(yaml);
-        this._showHint("Copied to clipboard.");
-      } catch (e) {
-        this._showHint("Could not copy automatically - select and copy manually.");
-      }
+    root.getElementById("btn-yaml-toggle").addEventListener("click", () => {
+      this._showYaml = !this._showYaml;
+      this._render();
     });
-
-    root.getElementById("btn-download").addEventListener("click", () => {
-      const yaml = buildYaml(this._themeName, this._values, this._modeValues);
-      const blob = new Blob([yaml], { type: "text/yaml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${this._themeName || "theme"}.yaml`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-  }
-
-  _showHint(msg) {
-    const el = this.shadowRoot.getElementById("copy-hint");
-    if (!el) return;
-    el.textContent = msg;
-    setTimeout(() => {
-      if (el.textContent === msg) el.textContent = "";
-    }, 3000);
-  }
-
-  _advancedBodyHtml() {
-    const a = this._advanced;
-    return `
-      <div class="dialog-sub">
-        Theme variables alone can't do shapes, buttons, or animations - that needs
-        <strong>card-mod</strong> (a separate, very popular HACS integration). This generates
-        a ready-to-paste snippet: a global default look for every card, plus opt-in classes
-        for individual cards. Colors reference your theme variables, so it adapts to whatever
-        you've set above - and updates live in the preview as you tweak it.
-      </div>
-
-      <div class="adv-controls">
-        <label class="adv-row">
-          <input type="checkbox" id="adv-hover" ${a.hoverElevate ? "checked" : ""} />
-          Hover-elevate animation (card lifts slightly on mouseover)
-        </label>
-
-        <label class="adv-row">
-          <span>Card shape / variant</span>
-          <select id="adv-variant">
-            ${Object.entries(CARD_VARIANT_LABELS)
-              .map(([key, label]) => `<option value="${key}" ${a.variant === key ? "selected" : ""}>${label}</option>`)
-              .join("")}
-          </select>
-        </label>
-
-        <label class="adv-row">
-          <span>Toggle / switch shape</span>
-          <select id="adv-toggle-style">
-            ${Object.entries(TOGGLE_STYLE_LABELS)
-              .map(([key, label]) => `<option value="${key}" ${a.toggleStyle === key ? "selected" : ""}>${label}</option>`)
-              .join("")}
-          </select>
-        </label>
-
-        <div class="adv-row">
-          <span>Animations (combinable, layered on top of the shape above)</span>
-          <div class="adv-checkbox-grid">
-            <label><input type="checkbox" id="adv-anim-glow" ${a.animations.glowPulse ? "checked" : ""} /> Glow pulse</label>
-            <label><input type="checkbox" id="adv-anim-shimmer" ${a.animations.shimmer ? "checked" : ""} /> Shimmer sweep</label>
-            <label><input type="checkbox" id="adv-anim-rotate" ${a.animations.rotatingBorder ? "checked" : ""} /> Rotating gradient border</label>
-            <label><input type="checkbox" id="adv-anim-ripple" ${a.animations.ripple ? "checked" : ""} /> Press flash (ripple approximation)</label>
-          </div>
-        </div>
-
-        <label class="adv-row">
-          <span>Transition speed: <strong id="adv-ms-label">${a.transitionMs}ms</strong></span>
-          <input type="range" id="adv-ms" min="50" max="600" step="10" value="${a.transitionMs}" />
-        </label>
-      </div>
-
-      <div class="adv-row" style="margin-top: 4px;">
-        <button class="btn-flat btn-small" id="adv-compare">⇔ Compare all shapes</button>
-      </div>
-
-      <div class="adv-yaml-label">Paste this into your theme file (merges alongside the fields above):</div>
-      <textarea id="adv-yaml-out" rows="12" readonly></textarea>
-
-      <div class="dialog-sub">
-        To use a shape on just one card instead of the global default, add to that card's
-        config: <code>card_mod:\u000A&nbsp;&nbsp;class: pill</code> (or any other shape name shown
-        in the dropdown, using its lowercase id - see the comment inside the generated YAML).
-        The toggle/switch snippet is best-effort - see the comment in the YAML if it doesn't
-        visibly apply to your HA version.
-      </div>
-
-      <div class="adv-actions">
-        <button class="btn" id="adv-copy">Copy YAML</button>
-      </div>
-
-      <div class="adv-divider"></div>
-
-      <div class="dialog-title-row">
-        <div class="adv-subheading">Background Animation</div>
-        <button class="btn-flat btn-small" id="bg-compare">⇔ Compare backgrounds</button>
-      </div>
-      <div class="dialog-sub">
-        A DIFFERENT injection point than the card shapes above (<code>card-mod-view</code>
-        instead of <code>card-mod-card</code>) - this styles the whole dashboard view behind
-        every card, not individual cards. Pure CSS, slow and subtle by design so it doesn't
-        fight with your cards for attention or tax weaker displays (e.g. a wall-mounted tablet).
-      </div>
-
-      <div class="adv-controls">
-        <label class="adv-row">
-          <span>Style</span>
-          <select id="adv-background">
-            <option value="none" ${a.background === "none" ? "selected" : ""}>None</option>
-            ${BACKGROUND_ANIMATIONS.map(
-              (b) => `<option value="${b.id}" ${a.background === b.id ? "selected" : ""}>${b.name}</option>`
-            ).join("")}
-          </select>
-        </label>
-      </div>
-      ${
-        a.background !== "none"
-          ? `<div class="dialog-sub">${BACKGROUND_ANIMATIONS.find((b) => b.id === a.background)?.description || ""}</div>
-             <div class="adv-yaml-label">Paste into your theme file (separate from the card shape YAML above):</div>
-             <textarea id="bg-yaml-out" rows="10" readonly></textarea>
-             <div class="adv-actions"><button class="btn" id="bg-copy">Copy YAML</button></div>`
-          : ""
-      }
-    `;
-  }
-
-  _bindAdvancedControls() {
-    const root = this.shadowRoot;
-    const out = root.getElementById("adv-yaml-out");
-    if (!out) return; // panel is collapsed, nothing to bind
-
-    const refresh = () => {
-      out.value = buildCardModSnippet(this._themeName, this._advanced);
-      this._applyAdvancedPreview();
-    };
-    refresh();
-
-    root.getElementById("adv-hover").addEventListener("change", (e) => {
-      this._advanced.hoverElevate = e.target.checked;
+    root.getElementById("btn-save").addEventListener("click", () => {
+      this._dirtyCount = 0;
       this._saveToStorage();
-      refresh();
+      const btn = root.getElementById("btn-save");
+      const original = btn.textContent;
+      btn.textContent = "Saved!";
+      const counter = root.getElementById("dirty-counter");
+      if (counter) counter.style.display = "none";
+      setTimeout(() => {
+        if (root.getElementById("btn-save")) root.getElementById("btn-save").textContent = original;
+      }, 1200);
     });
-    root.getElementById("adv-variant").addEventListener("change", (e) => {
-      this._advanced.variant = e.target.value;
-      this._saveToStorage();
-      refresh();
-    });
-    root.getElementById("adv-toggle-style").addEventListener("change", (e) => {
-      this._advanced.toggleStyle = e.target.value;
-      this._saveToStorage();
-      refresh();
-    });
-    const animMap = {
-      "adv-anim-glow": "glowPulse",
-      "adv-anim-shimmer": "shimmer",
-      "adv-anim-rotate": "rotatingBorder",
-      "adv-anim-ripple": "ripple",
-    };
-    for (const [id, key] of Object.entries(animMap)) {
-      root.getElementById(id).addEventListener("change", (e) => {
-        this._advanced.animations[key] = e.target.checked;
+
+    // Nav
+    root.querySelectorAll(".te-nav-row").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._activeSection = btn.dataset.section;
         this._saveToStorage();
-        refresh();
+        this._render();
+      });
+    });
+
+    // Field rows (color/text inputs)
+    root.querySelectorAll(".te-field-row input[data-key]").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const key = e.target.dataset.key;
+        const value = e.target.value;
+        const store = this._activeStore();
+        store[key] = value;
+        this._applyPreviewVars();
+        this._markDirty();
+        root.querySelectorAll(`input[data-key="${key}"]`).forEach((other) => {
+          if (other !== e.target) other.value = value;
+        });
+        const clearBtn = e.target.closest(".te-field-row")?.querySelector(".te-field-clear");
+        if (clearBtn) clearBtn.classList.toggle("hidden", !this._activeMode || value === "");
+      });
+    });
+    root.querySelectorAll("[data-clear]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.clear;
+        delete this._activeStore()[key];
+        this._applyPreviewVars();
+        this._markDirty();
+        this._render();
+      });
+    });
+
+    // Advanced: shapes
+    root.querySelectorAll("[data-shape]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._advanced.variant = btn.dataset.shape;
+        this._markDirty();
+        this._render();
+      });
+    });
+    root.querySelectorAll("[data-toggle-style]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._advanced.toggleStyle = btn.dataset.toggleStyle;
+        this._markDirty();
+        this._render();
+      });
+    });
+    root.querySelectorAll("[data-anim]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.dataset.anim;
+        this._advanced.animations[key] = !this._advanced.animations[key];
+        this._markDirty();
+        this._render();
+      });
+    });
+    const msSlider = root.getElementById("adv-ms");
+    if (msSlider) {
+      msSlider.addEventListener("input", (e) => {
+        this._advanced.transitionMs = parseInt(e.target.value, 10);
+        root.getElementById("adv-ms-label").textContent = `${this._advanced.transitionMs} ms`;
+        this._applyAdvancedPreview();
+        this._markDirty();
       });
     }
-    root.getElementById("adv-ms").addEventListener("input", (e) => {
-      this._advanced.transitionMs = parseInt(e.target.value, 10);
-      root.getElementById("adv-ms-label").textContent = `${this._advanced.transitionMs}ms`;
-      this._saveToStorage();
-      refresh();
-    });
-    root.getElementById("adv-compare").addEventListener("click", () => this._openVariantGalleryDialog());
-    root.getElementById("adv-copy").addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(out.value);
-        const btn = root.getElementById("adv-copy");
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-          if (root.getElementById("adv-copy")) root.getElementById("adv-copy").textContent = "Copy YAML";
-        }, 2000);
-      } catch (e) {
-        // clipboard API unavailable - user can select the textarea manually
-      }
+    const compareBtn = root.getElementById("adv-compare");
+    if (compareBtn) compareBtn.addEventListener("click", () => this._openVariantGalleryDialog());
+    root.querySelectorAll("[data-bg]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._advanced.background = btn.dataset.bg;
+        this._markDirty();
+        this._render();
+      });
     });
 
-    root.getElementById("adv-background").addEventListener("change", (e) => {
-      this._advanced.background = e.target.value;
-      this._saveToStorage();
-      this._render(); // background YAML textarea appears/disappears - needs a full re-render
+    // Preview column
+    root.querySelectorAll("#device-seg button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._previewDevice = btn.dataset.device;
+        this._saveToStorage();
+        this._render();
+      });
     });
+    const fullPreviewBtn = root.getElementById("btn-full-preview");
+    if (fullPreviewBtn) fullPreviewBtn.addEventListener("click", () => this._openFullPreviewDialog());
+    const compareShapesBtn = root.getElementById("btn-compare-shapes");
+    if (compareShapesBtn) compareShapesBtn.addEventListener("click", () => this._openVariantGalleryDialog());
 
-    const bgOut = root.getElementById("bg-yaml-out");
-    if (bgOut) bgOut.value = buildBackgroundYaml(this._advanced.background);
-
-    const bgCopyBtn = root.getElementById("bg-copy");
-    if (bgCopyBtn) {
-      bgCopyBtn.addEventListener("click", async () => {
+    // YAML drawer
+    const yamlTabSeg = root.getElementById("yaml-tab-seg");
+    if (yamlTabSeg) {
+      yamlTabSeg.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          this._yamlTab = btn.dataset.yamlTab;
+          this._render();
+        });
+      });
+    }
+    const yamlCopyBtn = root.getElementById("yaml-copy");
+    if (yamlCopyBtn) {
+      yamlCopyBtn.addEventListener("click", async () => {
+        const text = root.getElementById("yaml-code").textContent;
         try {
-          await navigator.clipboard.writeText(bgOut.value);
-          bgCopyBtn.textContent = "Copied!";
+          await navigator.clipboard.writeText(text);
+          yamlCopyBtn.textContent = "Copied!";
           setTimeout(() => {
-            if (root.getElementById("bg-copy")) root.getElementById("bg-copy").textContent = "Copy YAML";
-          }, 2000);
+            if (root.getElementById("yaml-copy")) root.getElementById("yaml-copy").textContent = "Copy";
+          }, 1500);
         } catch (e) {
-          // clipboard API unavailable - user can select the textarea manually
+          // clipboard unavailable - user can select the code block manually
         }
       });
     }
+    const yamlDownloadBtn = root.getElementById("yaml-download");
+    if (yamlDownloadBtn) {
+      yamlDownloadBtn.addEventListener("click", () => {
+        const text = root.getElementById("yaml-code").textContent;
+        const suffix = this._yamlTab === "card" ? "-card-mod" : this._yamlTab === "background" ? "-background" : "";
+        const blob = new Blob([text], { type: "text/yaml" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${this._themeName || "theme"}${suffix}.yaml`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+    const yamlCloseBtn = root.getElementById("yaml-close");
+    if (yamlCloseBtn) {
+      yamlCloseBtn.addEventListener("click", () => {
+        this._showYaml = false;
+        this._render();
+      });
+    }
 
-    const bgCompareBtn = root.getElementById("bg-compare");
-    if (bgCompareBtn) bgCompareBtn.addEventListener("click", () => this._openBackgroundGalleryDialog());
+    // <1024px: preview becomes a collapsible panel, toggled by a button CSS
+    // only shows at that width (see _css() .te-preview-toggle media rule)
+    const previewToggle = root.getElementById("te-preview-toggle");
+    if (previewToggle) {
+      previewToggle.addEventListener("click", () => {
+        this._navMobileOpen = !this._navMobileOpen;
+        this._render();
+      });
+    }
+  }
 
-    this._applyBackgroundPreview();
+  /* ---------------- dialogs ---------------- */
+
+  _openPresetsDialog() {
+    const existing = this.shadowRoot.getElementById("presets-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "presets-overlay";
+    overlay.className = "te-overlay";
+    overlay.innerHTML = `
+      <div class="te-dialog">
+        <div class="te-dialog-title-row">
+          <div class="te-dialog-title">Starter presets</div>
+          <button class="te-btn te-btn-icon" id="presets-close">✕</button>
+        </div>
+        <div class="te-dialog-sub">Loading a preset replaces your current base colors (Light/Dark overrides are kept). Export first if you want to keep your current work.</div>
+        <div class="te-preset-list">
+          ${PRESETS.map(
+            (p) => `
+            <div class="te-preset-item">
+              <div class="te-preset-swatches">
+                ${["primary-color", "primary-background-color", "card-background-color", "accent-color"]
+                  .map((k) => `<span class="te-preset-swatch" style="background:${p.values[k] || "#333"}"></span>`)
+                  .join("")}
+              </div>
+              <div class="te-preset-info">
+                <div class="te-preset-name">${p.name}</div>
+                <div class="te-preset-desc">${p.description}</div>
+              </div>
+              <button class="te-btn te-btn-small" data-preset="${p.id}">Load</button>
+            </div>
+          `
+          ).join("")}
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    overlay.querySelector("#presets-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelectorAll("[data-preset]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const preset = PRESETS.find((p) => p.id === btn.dataset.preset);
+        if (!preset) return;
+        this._values = { ...preset.values };
+        this._themeName = preset.id.replace(/-/g, "_");
+        this._activeMode = null;
+        this._markDirty();
+        overlay.remove();
+        this._render();
+      });
+    });
+  }
+
+  _openImportDialog() {
+    const existing = this.shadowRoot.getElementById("import-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "import-overlay";
+    overlay.className = "te-overlay";
+    overlay.innerHTML = `
+      <div class="te-dialog">
+        <div class="te-dialog-title-row">
+          <div class="te-dialog-title">Import theme YAML</div>
+          <button class="te-btn te-btn-icon" id="import-close">✕</button>
+        </div>
+        <div class="te-dialog-sub">Paste a Home Assistant theme block - flat or with a "modes: light: / dark:" section.</div>
+        <textarea id="import-text" rows="10" placeholder="my_theme:&#10;  primary-color: &quot;#03a9f4&quot;&#10;  ..."></textarea>
+        <div class="te-dialog-actions">
+          <button class="te-btn" id="import-cancel">Cancel</button>
+          <button class="te-btn te-btn-primary" id="import-apply">Apply</button>
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector("#import-close").addEventListener("click", close);
+    overlay.querySelector("#import-cancel").addEventListener("click", close);
+    overlay.querySelector("#import-apply").addEventListener("click", () => {
+      const text = overlay.querySelector("#import-text").value;
+      if (!text.trim()) {
+        overlay.remove();
+        return;
+      }
+      const { themeName, values, modeValues } = parseYaml(text);
+      this._themeName = themeName;
+      this._values = values;
+      this._modeValues = modeValues;
+      this._activeMode = null;
+      this._markDirty();
+      overlay.remove();
+      this._render();
+    });
   }
 
   _openVariantGalleryDialog() {
@@ -2341,51 +2516,50 @@ class ThemeEditorCard extends HTMLElement {
 
     const overlay = document.createElement("div");
     overlay.id = "variant-gallery-overlay";
-    overlay.className = "overlay";
+    overlay.className = "te-overlay";
     overlay.innerHTML = `
-      <div class="dialog dialog-full">
-        <div class="dialog-title-row">
-          <div class="dialog-title">Compare Shapes</div>
-          <button class="btn-flat btn-small" id="vg-close">Close</button>
+      <div class="te-dialog te-dialog-wide">
+        <div class="te-dialog-title-row">
+          <div class="te-dialog-title">Compare Shapes</div>
+          <button class="te-btn te-btn-icon" id="vg-close">✕</button>
         </div>
-        <div class="dialog-sub">
+        <div class="te-dialog-sub">
           All ${Object.keys(CARD_VARIANT_LABELS).length - 1} card shapes side by side, with your
-          current animations and colors applied. Click a card's name to copy the
-          <code>card_mod: class: ...</code> value for that shape.
+          current animations and colors applied. Click a card's name to copy its
+          <code>card_mod: class: ...</code> value.
         </div>
-        <div class="fp-grid" id="vg-grid">
+        <div class="te-gallery-grid">
           ${Object.entries(CARD_VARIANT_LABELS)
             .filter(([key]) => key !== "none")
-            .map(
-              ([key, label]) => `
-              <div class="mockup-card fp-card vg-card" data-variant="${key}" style="${key !== "none" ? CARD_VARIANT_DECLS[key] : ""}">
-                <div class="mockup-card-title">${label}</div>
-                <div class="mockup-row">
-                  <span class="mockup-label">On/Off</span>
+            .map(([key, label]) => {
+              const className = key === "glass" ? "glass-holo" : key;
+              return `
+              <div class="mockup-card vg-card" style="${CARD_VARIANT_DECLS[key]}">
+                <div class="pf-title">${label}</div>
+                <div class="pf-row" style="margin-top: 8px;">
+                  <span class="pf-sub">On/Off</span>
                   <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
                 </div>
-                <div class="mockup-slider"><span class="mockup-slider-fill" style="width:60%"></span></div>
-                <button class="vg-copy-class" data-class="${key === "glass" ? "glass-holo" : key}">card_mod: class: ${key === "glass" ? "glass-holo" : key}</button>
+                <div class="mockup-slider" style="margin-top: 8px;"><span class="mockup-slider-fill" style="width:60%"></span></div>
+                <button class="te-vg-copy" data-class="${className}">card_mod: class: ${className}</button>
               </div>
-            `
-            )
+            `;
+            })
             .join("")}
         </div>
       </div>
     `;
     this.shadowRoot.appendChild(overlay);
 
-    const dialogEl = overlay.querySelector(".dialog-full");
+    const dialogEl = overlay.querySelector(".te-dialog-wide");
     this._applyVarsToElement(dialogEl, this._computeEffectiveVars());
 
-    // Animations (independent of shape) applied uniformly across every card in the gallery,
-    // same as the live preview - only the shape/variant itself differs per card.
     const styleTag = document.createElement("style");
     styleTag.textContent = buildAnimationBlocks(".vg-card", this._advanced.animations).join("\n");
     overlay.appendChild(styleTag);
 
     overlay.querySelector("#vg-close").addEventListener("click", () => overlay.remove());
-    overlay.querySelectorAll(".vg-copy-class").forEach((btn) => {
+    overlay.querySelectorAll(".te-vg-copy").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         try {
@@ -2402,105 +2576,58 @@ class ThemeEditorCard extends HTMLElement {
     });
   }
 
-  _openBackgroundGalleryDialog() {
-    const existing = this.shadowRoot.getElementById("bg-gallery-overlay");
-    if (existing) existing.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "bg-gallery-overlay";
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="dialog dialog-full">
-        <div class="dialog-title-row">
-          <div class="dialog-title">Compare Backgrounds</div>
-          <button class="btn-flat btn-small" id="bgg-close">Close</button>
-        </div>
-        <div class="dialog-sub">
-          All ${BACKGROUND_ANIMATIONS.length} background animations, contained to their own
-          thumbnail here for comparison (on a real dashboard each one fills the whole screen
-          behind your cards). Click one to select it and generate its YAML.
-        </div>
-        <div class="bgg-grid" id="bgg-grid">
-          ${BACKGROUND_ANIMATIONS.map(
-            (b) => `
-            <div class="bgg-thumb theme-editor-bg-${b.id}" data-bg="${b.id}">
-              <div class="bgg-thumb-label">${b.name}</div>
-            </div>
-          `
-          ).join("")}
-        </div>
-      </div>
-    `;
-    this.shadowRoot.appendChild(overlay);
-
-    const dialogEl = overlay.querySelector(".dialog-full");
-    this._applyVarsToElement(dialogEl, this._computeEffectiveVars());
-
-    const styleTag = document.createElement("style");
-    styleTag.textContent = Object.values(BACKGROUND_ANIMATION_CSS).join("\n");
-    overlay.appendChild(styleTag);
-
-    overlay.querySelector("#bgg-close").addEventListener("click", () => overlay.remove());
-    overlay.querySelectorAll(".bgg-thumb").forEach((thumb) => {
-      thumb.addEventListener("click", () => {
-        this._advanced.background = thumb.dataset.bg;
-        this._saveToStorage();
-        overlay.remove();
-        this._render();
-      });
-    });
-  }
-
   _openFullPreviewDialog() {
     const existing = this.shadowRoot.getElementById("full-preview-overlay");
     if (existing) existing.remove();
 
     const overlay = document.createElement("div");
     overlay.id = "full-preview-overlay";
-    overlay.className = "overlay";
+    overlay.className = "te-overlay";
     overlay.innerHTML = `
-      <div class="dialog dialog-full">
-        <div class="dialog-title-row">
-          <div class="dialog-title">Full Preview</div>
-          <div class="dialog-title-actions">
-            <button class="btn-flat btn-small" id="fp-refresh">↻ Refresh</button>
-            <button class="btn-flat btn-small" id="fp-close">Close</button>
+      <div class="te-dialog te-dialog-wide">
+        <div class="te-dialog-title-row">
+          <div class="te-dialog-title">Full Preview</div>
+          <div class="te-dialog-title-actions">
+            <button class="te-btn te-btn-small" id="fp-refresh">↻ Refresh</button>
+            <button class="te-btn te-btn-icon" id="fp-close">✕</button>
           </div>
         </div>
-        <div class="dialog-sub">
+        <div class="te-dialog-sub">
           A snapshot of common Home Assistant card types with your current theme applied.
-          Not every possible card exists here - real dashboards have far more variety - but
-          this covers the most common ones. Hit Refresh after editing fields elsewhere to
-          re-sync this snapshot.
+          Not every possible card exists here, but this covers the most common ones. Hit
+          Refresh after editing fields elsewhere to re-sync this snapshot.
         </div>
-        <div class="fp-grid" id="fp-grid">
+        <div class="te-gallery-grid" id="fp-grid">
           ${this._fullPreviewCardsHtml()}
         </div>
       </div>
     `;
     this.shadowRoot.appendChild(overlay);
-    this._applyVarsToElement(overlay.querySelector(".dialog-full"), this._computeEffectiveVars());
+    const dialogEl = overlay.querySelector(".te-dialog-wide");
+    this._applyVarsToElement(dialogEl, this._computeEffectiveVars());
+    this._applyBackgroundPreview(dialogEl);
 
     overlay.querySelector("#fp-close").addEventListener("click", () => overlay.remove());
     overlay.querySelector("#fp-refresh").addEventListener("click", () => {
       overlay.querySelector("#fp-grid").innerHTML = this._fullPreviewCardsHtml();
-      this._applyVarsToElement(overlay.querySelector(".dialog-full"), this._computeEffectiveVars());
+      this._applyVarsToElement(overlay.querySelector(".te-dialog-wide"), this._computeEffectiveVars());
+      this._applyBackgroundPreview(overlay.querySelector(".te-dialog-wide"));
     });
   }
 
   _fullPreviewCardsHtml() {
     return `
       <div class="mockup-card fp-card">
-        <div class="mockup-card-title">Living Room Light</div>
-        <div class="mockup-row">
-          <span class="mockup-label">On/Off</span>
+        <div class="pf-title">Living Room Light</div>
+        <div class="pf-row" style="margin-top: 8px;">
+          <span class="pf-sub">On/Off</span>
           <span class="mockup-toggle adv-toggle on"><span class="knob"></span></span>
         </div>
-        <div class="mockup-slider"><span class="mockup-slider-fill" style="width:72%"></span></div>
+        <div class="mockup-slider" style="margin-top: 8px;"><span class="mockup-slider-fill" style="width:72%"></span></div>
       </div>
 
       <div class="mockup-card fp-card fp-thermostat">
-        <div class="mockup-card-title">Climate</div>
+        <div class="pf-title">Climate</div>
         <div class="fp-dial">
           <div class="fp-dial-value">21.5°</div>
           <div class="fp-dial-sub">Heating to 22°</div>
@@ -2513,7 +2640,7 @@ class ThemeEditorCard extends HTMLElement {
       </div>
 
       <div class="mockup-card fp-card fp-weather">
-        <div class="mockup-card-title">Weather</div>
+        <div class="pf-title">Weather</div>
         <div class="fp-weather-main">
           <span class="fp-weather-icon">⛅</span>
           <span class="fp-weather-temp">18°</span>
@@ -2524,7 +2651,7 @@ class ThemeEditorCard extends HTMLElement {
       </div>
 
       <div class="mockup-card fp-card fp-media">
-        <div class="mockup-card-title">Living Room Speaker</div>
+        <div class="pf-title">Living Room Speaker</div>
         <div class="fp-media-row">
           <div class="fp-media-art"></div>
           <div class="fp-media-info">
@@ -2537,22 +2664,22 @@ class ThemeEditorCard extends HTMLElement {
       </div>
 
       <div class="mockup-card fp-card fp-graph">
-        <div class="mockup-card-title">Temperature History</div>
+        <div class="pf-title">Temperature History</div>
         <svg class="fp-sparkline" viewBox="0 0 200 60" preserveAspectRatio="none">
           <polyline points="0,40 20,35 40,38 60,20 80,25 100,15 120,22 140,10 160,18 180,12 200,20" fill="none" stroke-width="2" />
         </svg>
-        <div class="mockup-big-value" style="font-size:20px">21.4°C</div>
+        <div class="fp-big-small">21.4°C</div>
       </div>
 
       <div class="mockup-card fp-card fp-entities">
-        <div class="mockup-card-title">Entities</div>
+        <div class="pf-title">Entities</div>
         <div class="fp-entity-row"><span class="fp-entity-icon">💡</span><span class="fp-entity-name">Kitchen Light</span><span class="mockup-toggle adv-toggle on"><span class="knob"></span></span></div>
         <div class="fp-entity-row"><span class="fp-entity-icon">🌡</span><span class="fp-entity-name">Living Room Temp</span><span class="fp-entity-value">21.4°C</span></div>
         <div class="fp-entity-row"><span class="fp-entity-icon">🔒</span><span class="fp-entity-name">Front Door</span><span class="fp-entity-value">Locked</span></div>
       </div>
 
       <div class="mockup-card fp-card fp-alarm">
-        <div class="mockup-card-title">Alarm</div>
+        <div class="pf-title">Alarm</div>
         <div class="fp-alarm-status">Armed Home</div>
         <div class="fp-keypad">
           ${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((n) => `<span class="fp-key">${n}</span>`).join("")}
@@ -2560,7 +2687,7 @@ class ThemeEditorCard extends HTMLElement {
       </div>
 
       <div class="mockup-card fp-card fp-camera">
-        <div class="mockup-card-title">Front Door Camera</div>
+        <div class="pf-title">Front Door Camera</div>
         <div class="fp-camera-placeholder">📷</div>
       </div>
 
@@ -2570,12 +2697,12 @@ class ThemeEditorCard extends HTMLElement {
       </div>
 
       <div class="mockup-card fp-card fp-gauge">
-        <div class="mockup-card-title">Humidity</div>
+        <div class="pf-title">Humidity</div>
         <div class="fp-gauge-ring"><span class="fp-gauge-value">46%</span></div>
       </div>
 
       <div class="mockup-card fp-card fp-badges">
-        <div class="mockup-card-title">Status &amp; Badges</div>
+        <div class="pf-title">Status &amp; Badges</div>
         <div class="fp-badge-row">
           <span class="mockup-badge success">Normal</span>
           <span class="mockup-badge warning">Warning</span>
@@ -2592,467 +2719,351 @@ class ThemeEditorCard extends HTMLElement {
     `;
   }
 
-  _openPresetsDialog() {
-    const existing = this.shadowRoot.getElementById("presets-overlay");
-    if (existing) existing.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "presets-overlay";
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="dialog">
-        <div class="dialog-title">Starter presets</div>
-        <div class="dialog-sub">Loading a preset replaces your current base colors (Light/Dark overrides are kept). This can't be undone from here - export first if you want to keep your current work.</div>
-        <div class="preset-list">
-          ${PRESETS.map(
-            (p) => `
-            <div class="preset-item">
-              <div class="preset-swatches">
-                ${["primary-color", "primary-background-color", "card-background-color", "accent-color"]
-                  .map((k) => `<span class="preset-swatch" style="background:${p.values[k] || "#333"}"></span>`)
-                  .join("")}
-              </div>
-              <div class="preset-info">
-                <div class="preset-name">${p.name}</div>
-                <div class="preset-desc">${p.description}</div>
-              </div>
-              <button class="btn" data-preset="${p.id}">Load</button>
-            </div>
-          `
-          ).join("")}
-        </div>
-        <div class="dialog-actions">
-          <button class="btn-flat" id="presets-cancel">Close</button>
-        </div>
-      </div>
-    `;
-    this.shadowRoot.appendChild(overlay);
-
-    overlay.querySelector("#presets-cancel").addEventListener("click", () => overlay.remove());
-    overlay.querySelectorAll("[data-preset]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const preset = PRESETS.find((p) => p.id === btn.dataset.preset);
-        if (!preset) return;
-        this._values = { ...preset.values };
-        this._themeName = preset.id.replace(/-/g, "_");
-        this._activeMode = null;
-        this._openGroups = new Set(
-          FIELD_GROUPS.filter((g) => g.fields.some((f) => preset.values[f.key])).map((g) => g.id)
-        );
-        this._saveToStorage();
-        overlay.remove();
-        this._render();
-      });
-    });
-  }
-
-  _openImportDialog() {
-    const existing = this.shadowRoot.getElementById("import-overlay");
-    if (existing) existing.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "import-overlay";
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="dialog">
-        <div class="dialog-title">Import theme YAML</div>
-        <div class="dialog-sub">Paste a Home Assistant theme block - flat or with a "modes: light: / dark:" section.</div>
-        <textarea id="import-text" rows="10" placeholder="my_theme:\n  primary-color: \"#03a9f4\"\n  ..."></textarea>
-        <div class="dialog-actions">
-          <button class="btn-flat" id="import-cancel">Cancel</button>
-          <button class="btn" id="import-apply">Apply</button>
-        </div>
-      </div>
-    `;
-    this.shadowRoot.appendChild(overlay);
-
-    overlay.querySelector("#import-cancel").addEventListener("click", () => overlay.remove());
-    overlay.querySelector("#import-apply").addEventListener("click", () => {
-      const text = overlay.querySelector("#import-text").value;
-      if (!text.trim()) {
-        overlay.remove();
-        return;
-      }
-      const { themeName, values, modeValues } = parseYaml(text);
-      this._themeName = themeName;
-      this._values = values;
-      this._modeValues = modeValues;
-      this._activeMode = null;
-      // open every group that has at least one imported value (base or mode), for visibility
-      this._openGroups = new Set(
-        FIELD_GROUPS.filter((g) =>
-          g.fields.some((f) => values[f.key] || modeValues.light[f.key] || modeValues.dark[f.key])
-        ).map((g) => g.id)
-      );
-      if (this._openGroups.size === 0) this._openGroups.add(FIELD_GROUPS[0].id);
-      this._saveToStorage();
-      overlay.remove();
-      this._render();
-    });
-  }
-
-  _escAttr(str) {
-    return String(str).replace(/"/g, "&quot;");
-  }
-
   /* ---------------- styles ---------------- */
 
   _css() {
     return `
-      :host { display: block; }
-      ha-card { padding: 16px; display: block; }
-      .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-      .header-title { display: flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 500; }
-      .header-actions { display: flex; gap: 8px; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
-      .theme-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-      .theme-name-row label { font-size: 13px; color: var(--secondary-text-color, #888); white-space: nowrap; }
-      .theme-name-row input {
-        flex: 1; padding: 6px 8px; border-radius: 6px;
-        border: 1px solid var(--divider-color, #444);
-        background: var(--card-background-color, #1e1e1e);
-        color: var(--primary-text-color, #fff);
-        font-family: monospace;
+      :host {
+        --te-app: #111a20; --te-surface: #16222a; --te-rail: #0e171d; --te-input: #0f1a20;
+        --te-border: #223038; --te-border-str: #22323c; --te-text: #e7edf1; --te-text-2: #9fb2bd;
+        --te-text-3: #62798a; --te-accent: #7fb2e5; --te-active-bg: #1b2a34; --te-dirty: #d8b46a;
+        display: block;
+        font-family: 'IBM Plex Sans', -apple-system, sans-serif;
       }
+      * { box-sizing: border-box; }
+      ha-card { padding: 0; overflow: hidden; background: var(--te-app); border-radius: 10px; }
 
-      .btn {
-        padding: 8px 14px; border-radius: 6px; border: none;
-        background: var(--primary-color, #03a9f4); color: white;
-        font-weight: 500; cursor: pointer; font-size: 13px;
-      }
-      .btn:hover { filter: brightness(1.08); }
-      .btn-clear {
-        border: none; background: transparent; cursor: pointer;
-        color: var(--secondary-text-color, #888); font-size: 12px;
-        padding: 2px 4px; flex-shrink: 0;
-      }
-      .btn-clear:hover { color: var(--error-color, #db4437); }
-      .btn-clear.hidden { visibility: hidden; }
+      button { font-family: inherit; cursor: pointer; }
+      input { font-family: inherit; }
+      :focus-visible { outline: 2px solid var(--te-accent); outline-offset: 1px; }
 
-      .mode-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-      .mode-toggle { display: flex; border: 1px solid var(--divider-color, #444); border-radius: 6px; overflow: hidden; }
-      .mode-btn {
-        border: none; background: transparent; color: inherit; cursor: pointer;
-        padding: 6px 12px; font-size: 12px; border-right: 1px solid var(--divider-color, #444);
-      }
-      .mode-btn:last-child { border-right: none; }
-      .mode-btn.active { background: var(--primary-color, #03a9f4); color: white; }
-      .mode-hint {
-        font-size: 12px; color: var(--secondary-text-color, #888);
-        margin-bottom: 10px; padding: 6px 10px; border-radius: 6px;
-        background: rgba(127,127,127,0.08);
-      }
-      .btn-flat {
-        padding: 8px 12px; border-radius: 6px;
-        border: 1px solid var(--divider-color, #444);
-        background: transparent; color: var(--primary-text-color, inherit);
-        cursor: pointer; font-size: 13px;
-      }
-      .btn-flat:hover { background: rgba(127,127,127,0.1); }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: #2b3439; border-radius: 5px; }
+      ::-webkit-scrollbar-track { background: transparent; }
 
-      .export-row { display: flex; gap: 8px; margin-top: 18px; }
-      .hint { margin-top: 8px; font-size: 12px; color: var(--secondary-text-color, #888); min-height: 16px; }
-
-      /* Groups */
-      .groups { display: flex; flex-direction: column; gap: 6px; }
-      .group { border: 1px solid var(--divider-color, #333); border-radius: 8px; overflow: hidden; }
-      .group-header {
-        width: 100%; display: flex; align-items: center; gap: 8px;
-        padding: 10px 12px; background: rgba(127,127,127,0.06);
-        border: none; cursor: pointer; text-align: left;
-        font-size: 14px; font-weight: 500; color: inherit;
-      }
-      .chevron { width: 10px; display: inline-block; opacity: 0.7; }
-      .group-body { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
-      @media (max-width: 500px) { .group-body { grid-template-columns: 1fr; } }
-      .advanced-body { display: block !important; }
-      .adv-actions { margin-top: 10px; }
-
-      .field { display: flex; flex-direction: column; gap: 4px; }
-      .field label { font-size: 12px; color: var(--secondary-text-color, #888); }
-      .field-input { display: flex; gap: 6px; align-items: center; }
-      .field-input input[type="color"] {
-        width: 32px; height: 32px; padding: 0; border: 1px solid var(--divider-color, #444);
-        border-radius: 6px; background: none; cursor: pointer; flex-shrink: 0;
-      }
-      .field-input input[type="text"], .field-input .hex-text {
-        flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px;
-        border: 1px solid var(--divider-color, #444);
-        background: var(--card-background-color, #1e1e1e);
-        color: var(--primary-text-color, #fff);
-        font-family: monospace; font-size: 12px;
+      .te-root {
+        container-type: inline-size;
+        container-name: te;
+        display: grid;
+        grid-template-rows: 56px 1fr auto;
+        background: var(--te-app);
+        color: var(--te-text);
+        min-height: 560px;
       }
 
-      /* Live mockup preview - scoped to its own CSS vars, not the real dashboard */
-      .preview-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-      .preview-toolbar-actions { display: flex; align-items: center; gap: 8px; }
-      .btn-small { padding: 4px 10px; font-size: 12px; }
-      .preview-label { font-size: 12px; color: var(--secondary-text-color, #888); text-transform: uppercase; letter-spacing: 0.04em; }
-      .device-toggle { display: flex; border: 1px solid var(--divider-color, #444); border-radius: 6px; overflow: hidden; }
-      .device-btn {
-        border: none; background: transparent; cursor: pointer;
-        padding: 4px 10px; font-size: 13px; border-right: 1px solid var(--divider-color, #444);
-        filter: grayscale(1); opacity: 0.6;
+      /* ---------- Topbar ---------- */
+      .te-topbar {
+        display: flex; align-items: center; gap: 14px; padding: 0 18px; height: 56px;
+        background: var(--te-surface); border-bottom: 1px solid var(--te-border-str);
+        flex-shrink: 0; overflow-x: auto;
       }
-      .device-btn:last-child { border-right: none; }
-      .device-btn.active { background: rgba(127,127,127,0.15); filter: none; opacity: 1; }
+      .te-brand { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+      .te-vdiv { width: 1px; height: 24px; background: var(--te-border-str); flex-shrink: 0; }
+      .te-name-field { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+      .te-label-inline { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--te-text-3); white-space: nowrap; }
+      .te-name-field input {
+        width: 150px; height: 32px; padding: 0 10px; border-radius: 6px;
+        border: 1px solid #2c3d47; background: var(--te-input); color: var(--te-text);
+        font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;
+      }
+      .te-spacer { flex: 1; }
+      .te-dirty { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--te-dirty); white-space: nowrap; margin-right: 4px; }
 
-      .preview-wrap {
-        margin-bottom: 18px; border-radius: 8px; overflow: hidden;
-        border: 1px solid var(--divider-color, #333);
-        /* Background animations use position:fixed (correct for a real dashboard, which
-           should fill the whole viewport). transform establishes a new containing block
-           per spec, so fixed-position descendants are confined to THIS box in our preview
-           instead of covering the real browser window. */
-        transform: translateZ(0);
-        position: relative;
+      .te-seg { display: flex; background: var(--te-input); border: 1px solid #2c3d47; border-radius: 7px; padding: 2px; gap: 2px; flex-shrink: 0; }
+      .te-seg button {
+        height: 26px; padding: 0 11px; border-radius: 5px; border: none; background: transparent;
+        color: var(--te-text-2); font-size: 12px; white-space: nowrap;
       }
-      .preview-wrap.mobile { display: flex; justify-content: center; padding: 16px; background: rgba(0,0,0,0.15); }
-      .preview-wrap.mobile .mockup {
-        width: 300px; border-radius: 22px; overflow: hidden;
-        border: 6px solid #000; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      .te-seg button.on { background: var(--te-accent); color: #0f1c2e; font-weight: 600; }
+
+      .te-btn {
+        height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid #2c3d47;
+        background: transparent; color: #c4d3dc; font-size: 12.5px; white-space: nowrap; flex-shrink: 0;
       }
-      .preview-wrap.mobile .mockup-sidebar { display: none; }
-      .preview-wrap.mobile .mockup-body { flex-direction: column; }
-      .preview-wrap.mobile .mockup-main { flex-direction: column; }
-      .preview-wrap.mobile .mockup-card { min-width: 0; }
-      .preview-wrap.mobile .mockup-header {
+      .te-btn:hover { border-color: #46606f; }
+      .te-btn-danger { color: #a4b6c1; }
+      .te-btn-danger:hover { border-color: #6d4a4a; color: #e0a49b; }
+      .te-btn-accent { border-color: #3a5f7d; color: #9dc4e6; }
+      .te-btn-accent:hover { border-color: #5b87ab; }
+      .te-btn-primary { border: none; background: var(--te-accent); color: #0f1c2e; font-weight: 600; }
+      .te-btn-primary:hover { background: #a3c9ee; }
+      .te-btn-small { height: 28px; padding: 0 10px; font-size: 11.5px; border-radius: 5px; }
+      .te-btn-icon { width: 28px; height: 28px; padding: 0; font-size: 13px; color: var(--te-text-2); }
+
+      /* ---------- Workspace (nav / content / preview) ---------- */
+      .te-workspace { display: flex; min-height: 0; }
+
+      .te-nav {
+        width: 178px; flex-shrink: 0; background: var(--te-rail);
+        border-right: 1px solid #1e2c34; padding: 12px 8px; overflow-y: auto;
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      .te-nav-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--te-text-3); padding: 4px 10px 8px; }
+      .te-nav-row {
+        display: flex; align-items: center; gap: 8px; width: 100%; border: none; text-align: left;
+        padding: 8px 10px; border-radius: 7px; font-size: 13px; background: transparent; color: var(--te-text-2);
+      }
+      .te-nav-row.on { background: var(--te-active-bg); color: var(--te-text); font-weight: 600; }
+      .te-nav-marker { width: 3px; height: 16px; border-radius: 2px; background: transparent; flex-shrink: 0; }
+      .te-nav-row.on .te-nav-marker { background: var(--te-accent); }
+      .te-nav-label-text { flex: 1; text-align: left; }
+      .te-nav-count { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #5d7382; flex-shrink: 0; }
+      .te-nav-row.on .te-nav-count { color: #9dc4e6; }
+
+      .te-content { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px 40px; }
+      .te-content-inner { max-width: 760px; }
+      .te-content-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+      .te-content-head h2 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+      .te-content-count { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6d8797; }
+      .te-content-hint { font-size: 13px; line-height: 1.55; color: #90a5b2; margin-bottom: 20px; max-width: 620px; }
+
+      .te-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+      @container te (max-width: 1279px) { .te-field-grid { grid-template-columns: 1fr; } }
+
+      .te-field-row {
+        display: flex; align-items: center; gap: 10px; height: 48px;
+        background: var(--te-surface); border: 1px solid var(--te-border); border-radius: 8px; padding: 8px 10px;
+      }
+      .te-swatch {
+        width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; padding: 0;
+        border: 1px solid rgba(255,255,255,.16); background: none; cursor: pointer;
+      }
+      .te-unit-box {
         display: flex; align-items: center; justify-content: center;
-        font-size: 11px; padding: 8px 10px;
+        font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #8aa3bd;
+        background: var(--te-input); cursor: default;
       }
-      .mockup { background: var(--primary-background-color, #111); font-family: sans-serif; }
-      .mockup-header {
-        background: var(--app-header-background-color, #0b0b0b);
-        color: var(--app-header-text-color, #fff);
-        padding: 10px 14px; font-size: 13px; font-weight: 600;
-        border-bottom: 1px solid var(--divider-color, #292929);
+      .te-field-names { flex: 1; min-width: 0; }
+      .te-field-label { font-size: 12.5px; color: #dbe6ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .te-field-key { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #6d8797; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .te-field-hex {
+        width: 84px; height: 30px; padding: 0 8px; border-radius: 5px; flex-shrink: 0;
+        border: 1px solid #2c3d47; background: var(--te-input); color: #cfe0ea;
+        font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; text-align: center;
       }
-      .mockup-body { display: flex; }
-      .mockup-sidebar {
-        width: 140px; background: var(--sidebar-background-color, #0b0b0b);
-        border-right: 1px solid var(--sidebar-border-color, #292929);
-        padding: 10px 0; flex-shrink: 0;
+      .te-field-text { width: 84px; }
+      .te-field-clear {
+        border: none; background: transparent; cursor: pointer; flex-shrink: 0;
+        color: var(--te-text-3); font-size: 12px; padding: 2px 4px;
       }
-      .mockup-side-item {
-        display: flex; align-items: center; gap: 8px;
-        padding: 8px 14px; font-size: 12px;
-        color: var(--sidebar-text-color, #fff);
-      }
-      .mockup-side-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sidebar-icon-color, #a3a3a3); }
-      .mockup-side-item.active { color: var(--sidebar-selected-text-color, #03a9f4); }
-      .mockup-side-item.active .dot { background: var(--sidebar-selected-icon-color, #03a9f4); }
+      .te-field-clear:hover { color: #e0a49b; }
+      .te-field-clear.hidden { visibility: hidden; }
 
-      .mockup-main { flex: 1; padding: 14px; display: flex; gap: var(--grid-gap, 16px); flex-wrap: wrap; }
+      /* ---------- Advanced blocks ---------- */
+      .te-adv-block { margin-bottom: 22px; }
+      .te-adv-block-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+      .te-adv-block-title { font-size: 13px; font-weight: 600; color: #dbe6ed; }
+      .te-adv-block-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6d8797; }
+
+      .te-shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .te-shape-grid-4 { grid-template-columns: repeat(4, 1fr); }
+      @container te (max-width: 700px) { .te-shape-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-shape-tile {
+        display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+        padding: 10px; border-radius: 9px; background: var(--te-surface); border: 1px solid var(--te-border);
+        color: var(--te-text-2); font-size: 11.5px; text-align: center; font-family: 'IBM Plex Sans', sans-serif;
+      }
+      .te-shape-tile.on { background: var(--te-active-bg); border-color: var(--te-accent); color: var(--te-text); }
+      .te-shape-chip { height: 34px; background: #182b41; }
+      .te-toggle-tile { flex-direction: row; align-items: center; justify-content: center; height: 46px; padding: 6px 10px; gap: 8px; }
+      .te-toggle-tile .mockup-toggle { pointer-events: none; }
+      .toggle-preview-square, .toggle-preview-square .knob { border-radius: 4px !important; }
+      .toggle-preview-sharp, .toggle-preview-sharp .knob { border-radius: 0 !important; }
+      .toggle-preview-neon-track { box-shadow: 0 0 8px color-mix(in srgb, var(--primary-color, #7fb2e5) 55%, transparent); }
+
+      .te-anim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      @container te (max-width: 700px) { .te-anim-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-anim-tile {
+        display: flex; align-items: center; gap: 8px; width: 100%; height: 36px;
+        padding: 0 10px; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px;
+        background: var(--te-surface); border: 1px solid var(--te-border); color: var(--te-text-2);
+      }
+      .te-anim-tile.on { background: var(--te-active-bg); border-color: #3a5f7d; color: var(--te-text); }
+      .te-anim-box {
+        width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 10px;
+        background: transparent; color: #0f1c2e; border: 1px solid #3a4b56;
+      }
+      .te-anim-tile.on .te-anim-box { background: var(--te-accent); border: none; }
+
+      .te-transition-row {
+        display: flex; align-items: center; gap: 12px; margin-top: 14px;
+        background: var(--te-surface); border: 1px solid var(--te-border); border-radius: 8px; padding: 10px 12px;
+      }
+      .te-transition-row span:first-child { font-size: 12.5px; color: #dbe6ed; white-space: nowrap; }
+      .te-transition-row input[type="range"] { flex: 1; accent-color: var(--te-accent); }
+      .te-transition-val { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9dc4e6; width: 56px; text-align: right; }
+
+      .te-bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      @container te (max-width: 700px) { .te-bg-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-bg-tile {
+        display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 9px;
+        background: var(--te-surface); border: 1px solid var(--te-border); color: var(--te-text-2);
+        font-size: 11.5px; text-align: center; font-family: 'IBM Plex Sans', sans-serif;
+      }
+      .te-bg-tile.on { background: var(--te-active-bg); border-color: var(--te-accent); color: var(--te-text); }
+      .te-bg-stage {
+        position: relative; overflow: hidden; height: 52px; border-radius: 5px; background: var(--primary-background-color, #0f1c2e);
+        transform: translateZ(0); /* containment for position:fixed inside background CSS - see JS comment */
+      }
+
+      /* ---------- Preview column ---------- */
+      .te-preview-col {
+        width: 430px; flex-shrink: 0; background: var(--te-rail); border-left: 1px solid #1e2c34;
+        display: flex; flex-direction: column; min-height: 0;
+      }
+      .te-preview-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #1e2c34; flex-shrink: 0; }
+      .te-preview-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--te-text-3); flex: 1; }
+      .te-preview-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; justify-content: center; min-height: 0; }
+      .te-preview-frame {
+        border-radius: 10px; overflow: hidden; border: 1px solid var(--te-border-str);
+        background: var(--primary-background-color, #0f1c2e); align-self: flex-start;
+        transform: translateZ(0); position: relative; /* fixed-position background containment */
+      }
+      .te-preview-foot { padding: 10px 14px; border-top: 1px solid #1e2c34; display: flex; gap: 8px; flex-shrink: 0; }
+      .te-preview-foot .te-btn { flex: 1; }
+
+      .pf-header {
+        display: flex; justify-content: space-between; align-items: center; padding: 9px 12px;
+        background: var(--primary-background-color, #0f1c2e); color: var(--primary-color, #7fb2e5);
+        font-size: 12px; border-bottom: 1px solid var(--divider-color, #213851);
+      }
+      .pf-header-left { display: flex; gap: 6px; align-items: center; }
+      .pf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color, #7fb2e5); }
+      .pf-header-right { opacity: .6; }
+      .pf-body { position: relative; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 300px; isolation: isolate; }
+      .pf-row { display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 1; }
+      .pf-title { color: var(--primary-text-color, #e6ecf4); font-size: 13.5px; font-weight: 500; position: relative; z-index: 1; }
+      .pf-sub { color: var(--secondary-text-color, #8aa3bd); font-size: 11.5px; margin-top: 2px; }
+      .pf-big { color: var(--primary-color, #7fb2e5); font-size: 24px; font-weight: 600; margin-top: 4px; letter-spacing: -0.01em; position: relative; z-index: 1; }
+      .pf-big-small { color: var(--primary-color, #7fb2e5); font-size: 20px; font-weight: 600; margin-top: 4px; }
+      .pf-badges { display: flex; gap: 8px; position: relative; z-index: 1; }
+
+      /* Shared mockup-card look (used by preview frame, full preview, compare gallery) */
       .mockup-card {
-        background: var(--ha-card-background, var(--card-background-color, #1e1e1e));
-        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, #292929));
-        border-radius: var(--ha-card-border-radius, 12px);
-        padding: 12px; min-width: 160px; flex: 1;
-        color: var(--primary-text-color, #fff);
+        background: var(--ha-card-background, var(--card-background-color, #182b41));
+        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, #213851));
+        border-radius: var(--ha-card-border-radius, 10px);
+        padding: 12px 14px; color: var(--primary-text-color, #e6ecf4);
+        position: relative; z-index: 1;
       }
-      .mockup-card-title {
-        font-size: var(--paper-font-subhead_-_font-size, 16px);
-        margin-bottom: 10px; font-weight: 600;
-      }
-      .mockup-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-      .mockup-label { font-size: var(--paper-font-caption_-_font-size, 12px); color: var(--secondary-text-color, #a3a3a3); }
-      .mockup-toggle { width: 34px; height: 18px; border-radius: 9px; position: relative; display: inline-block; }
-      .mockup-toggle.on { background: var(--switch-checked-track-color, #0288d1); }
-      .mockup-toggle .knob {
-        width: 14px; height: 14px; border-radius: 50%; background: var(--switch-checked-button-color, #03a9f4);
-        position: absolute; top: 2px; right: 2px;
-      }
-      .mockup-slider { height: 4px; border-radius: 2px; background: var(--slider-bar-color, #292929); }
-      .mockup-slider-fill { display: block; width: 65%; height: 4px; border-radius: 2px; background: var(--slider-color, #03a9f4); }
-      .mockup-big-value { font-size: var(--paper-font-headline_-_font-size, 24px); font-weight: 700; margin-bottom: 8px; }
+      .mockup-toggle { width: 40px; height: 22px; border-radius: 11px; display: flex; align-items: center; padding: 0 3px; background: var(--switch-checked-track-color, #3c6395); }
+      .mockup-toggle .knob { width: 16px; height: 16px; border-radius: 50%; background: var(--switch-checked-button-color, var(--primary-color, #7fb2e5)); margin-left: auto; }
+      .mockup-slider { height: 6px; border-radius: 3px; background: var(--slider-bar-color, #1f3450); overflow: hidden; }
+      .mockup-slider-fill { display: block; height: 100%; background: var(--slider-color, var(--primary-color, #7fb2e5)); }
       .mockup-badge {
-        display: inline-block; font-size: 11px; padding: 3px 7px; border-radius: 4px;
-        margin-right: 6px; border: 1px solid; font-weight: 600;
+        flex: 1; text-align: center; padding: 7px 0; border-radius: var(--ha-card-border-radius, 8px); font-size: 11.5px;
       }
-      .mockup-badge.success { color: var(--success-color, #43a047); border-color: var(--success-color, #43a047); }
-      .mockup-badge.warning { color: var(--warning-color, #ffa600); border-color: var(--warning-color, #ffa600); }
-      .mockup-badge.error { color: var(--error-color, #db4437); border-color: var(--error-color, #db4437); }
+      .mockup-badge.success { background: rgba(111,184,148,.16); color: var(--success-color, #6fb894); }
+      .mockup-badge.warning { background: rgba(224,178,95,.16); color: var(--warning-color, #e0b25f); }
+      .mockup-badge.error { background: rgba(224,112,95,.16); color: var(--error-color, #e0705f); }
 
-      /* Full Preview dialog */
-      .dialog-full { width: min(960px, 96vw); max-height: 88vh; overflow-y: auto; }
-      .dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
-      .dialog-title-actions { display: flex; gap: 8px; }
-      .fp-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 12px; margin-top: 8px;
-      }
-      .fp-card { color: var(--primary-text-color, #fff); }
+      /* ---------- YAML drawer ---------- */
+      .te-yaml-drawer { height: 260px; flex-shrink: 0; background: #0b1216; border-top: 1px solid var(--te-border-str); display: flex; flex-direction: column; }
+      .te-yaml-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #1a252b; flex-shrink: 0; }
+      .te-yaml-code { margin: 0; flex: 1; overflow: auto; padding: 12px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8; white-space: pre; }
 
-      /* Thermostat */
-      .fp-dial {
-        width: 96px; height: 96px; border-radius: 50%; margin: 8px auto;
-        border: 4px solid var(--primary-color, #03a9f4);
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      /* ---------- Dialogs ---------- */
+      .te-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
+      .te-dialog {
+        background: var(--te-surface); color: var(--te-text); padding: 18px; border-radius: 10px;
+        width: min(480px, 90vw); display: flex; flex-direction: column; gap: 10px;
+        border: 1px solid var(--te-border-str);
       }
+      .te-dialog-wide { width: min(960px, 96vw); max-height: 88vh; overflow-y: auto; transform: translateZ(0); position: relative; }
+      .te-dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
+      .te-dialog-title { font-size: 16px; font-weight: 600; }
+      .te-dialog-title-actions { display: flex; gap: 8px; }
+      .te-dialog-sub { font-size: 12px; color: var(--te-text-3); line-height: 1.5; }
+      .te-dialog-sub code { background: rgba(127,127,127,0.15); padding: 1px 5px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; }
+      .te-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+      .te-dialog textarea {
+        width: 100%; box-sizing: border-box; font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+        background: var(--te-input); color: inherit; border: 1px solid #2c3d47; border-radius: 6px; padding: 8px; resize: vertical;
+      }
+
+      .te-preset-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+      .te-preset-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--te-border); border-radius: 8px; padding: 8px 10px; }
+      .te-preset-swatches { display: flex; flex-shrink: 0; }
+      .te-preset-swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); margin-left: -6px; }
+      .te-preset-swatch:first-child { margin-left: 0; }
+      .te-preset-info { flex: 1; min-width: 0; }
+      .te-preset-name { font-size: 13px; font-weight: 600; }
+      .te-preset-desc { font-size: 11px; color: var(--te-text-3); }
+
+      .te-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 4px; }
+      .te-vg-copy {
+        margin-top: 10px; width: 100%; padding: 5px 8px; font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+        border-radius: 4px; cursor: pointer; background: rgba(127,127,127,0.12); border: 1px solid var(--te-border);
+        color: var(--te-text-3); position: relative; z-index: 1;
+      }
+      .te-vg-copy:hover { background: rgba(127,127,127,0.22); }
+
+      /* Full Preview sub-card styling (thermostat/weather/media/etc, unchanged concepts from v1.x) */
+      .fp-dial { width: 96px; height: 96px; border-radius: 50%; margin: 8px auto; border: 4px solid var(--primary-color, #7fb2e5); display: flex; flex-direction: column; align-items: center; justify-content: center; }
       .fp-dial-value { font-size: 20px; font-weight: 700; }
-      .fp-dial-sub { font-size: 10px; color: var(--secondary-text-color, #a3a3a3); text-align: center; }
+      .fp-dial-sub { font-size: 10px; color: var(--secondary-text-color, #8aa3bd); text-align: center; }
       .fp-chip-row { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
-      .fp-chip {
-        font-size: 10px; padding: 3px 8px; border-radius: 10px;
-        border: 1px solid var(--divider-color, #292929); color: var(--secondary-text-color, #a3a3a3);
-      }
-      .fp-chip.active { background: var(--primary-color, #03a9f4); color: white; border-color: var(--primary-color, #03a9f4); }
-
-      /* Weather */
+      .fp-chip { font-size: 10px; padding: 3px 8px; border-radius: 10px; border: 1px solid var(--divider-color, #213851); color: var(--secondary-text-color, #8aa3bd); }
+      .fp-chip.active { background: var(--primary-color, #7fb2e5); color: white; border-color: var(--primary-color, #7fb2e5); }
       .fp-weather-main { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
       .fp-weather-icon { font-size: 28px; }
       .fp-weather-temp { font-size: 26px; font-weight: 700; }
-      .fp-weather-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--secondary-text-color, #a3a3a3); }
-
-      /* Media player */
+      .fp-weather-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--secondary-text-color, #8aa3bd); }
       .fp-media-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-      .fp-media-art { width: 40px; height: 40px; border-radius: 6px; background: var(--accent-color, #ff9800); flex-shrink: 0; }
+      .fp-media-art { width: 40px; height: 40px; border-radius: 6px; background: var(--accent-color, #e8e3d3); flex-shrink: 0; }
       .fp-media-track { font-size: 13px; font-weight: 600; }
-      .fp-media-artist { font-size: 11px; color: var(--secondary-text-color, #a3a3a3); }
+      .fp-media-artist { font-size: 11px; color: var(--secondary-text-color, #8aa3bd); }
       .fp-media-controls { text-align: center; margin-top: 8px; font-size: 16px; letter-spacing: 4px; }
-
-      /* Graph / sparkline */
       .fp-sparkline { width: 100%; height: 44px; margin: 6px 0; }
-      .fp-sparkline polyline { stroke: var(--primary-color, #03a9f4); }
-
-      /* Entities list */
+      .fp-sparkline polyline { stroke: var(--primary-color, #7fb2e5); }
       .fp-entity-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; }
       .fp-entity-icon { flex-shrink: 0; }
       .fp-entity-name { flex: 1; }
-      .fp-entity-value { color: var(--secondary-text-color, #a3a3a3); }
-
-      /* Alarm */
-      .fp-alarm-status {
-        text-align: center; font-size: 12px; font-weight: 600; margin: 6px 0;
-        color: var(--state-active-color, #03a9f4);
-      }
+      .fp-entity-value { color: var(--secondary-text-color, #8aa3bd); }
+      .fp-alarm-status { text-align: center; font-size: 12px; font-weight: 600; margin: 6px 0; color: var(--state-active-color, #7fb2e5); }
       .fp-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
-      .fp-key {
-        text-align: center; padding: 6px 0; font-size: 12px; border-radius: 4px;
-        background: var(--secondary-background-color, #1c1c1c); color: var(--primary-text-color, #fff);
-      }
-
-      /* Camera */
-      .fp-camera-placeholder {
-        height: 90px; border-radius: 6px; background: var(--secondary-background-color, #1c1c1c);
-        display: flex; align-items: center; justify-content: center; font-size: 26px; opacity: 0.6;
-      }
-
-      /* Button card */
+      .fp-key { text-align: center; padding: 6px 0; font-size: 12px; border-radius: 4px; background: var(--secondary-background-color, #152438); color: var(--primary-text-color, #e6ecf4); }
+      .fp-camera-placeholder { height: 90px; border-radius: 6px; background: var(--secondary-background-color, #152438); display: flex; align-items: center; justify-content: center; font-size: 26px; opacity: 0.6; }
       .fp-button-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 90px; }
-      .fp-button-icon { font-size: 26px; color: var(--state-icon-active-color, #03a9f4); }
+      .fp-button-icon { font-size: 26px; color: var(--state-icon-active-color, #7fb2e5); }
       .fp-button-label { font-size: 12px; }
-
-      /* Gauge */
       .fp-gauge-ring {
-        width: 90px; height: 90px; border-radius: 50%; margin: 8px auto;
-        background: conic-gradient(var(--primary-color, #03a9f4) 46%, var(--divider-color, #292929) 0);
+        width: 90px; height: 90px; border-radius: 50%; margin: 8px auto; position: relative;
+        background: conic-gradient(var(--primary-color, #7fb2e5) 46%, var(--divider-color, #213851) 0);
         display: flex; align-items: center; justify-content: center;
       }
-      .fp-gauge-ring::before {
-        content: ""; position: absolute; width: 66px; height: 66px; border-radius: 50%;
-        background: var(--ha-card-background, var(--card-background-color, #1e1e1e));
-      }
-      .fp-gauge-ring { position: relative; }
+      .fp-gauge-ring::before { content: ""; position: absolute; width: 66px; height: 66px; border-radius: 50%; background: var(--ha-card-background, var(--card-background-color, #182b41)); }
       .fp-gauge-value { position: relative; z-index: 1; font-size: 15px; font-weight: 700; }
-
-      /* Badges card */
       .fp-badge-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
       .fp-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
 
-      /* Variant comparison gallery */
-      .vg-copy-class {
-        margin-top: 10px; width: 100%; padding: 5px 8px; font-size: 10px;
-        font-family: monospace; border-radius: 4px; cursor: pointer;
-        background: rgba(127,127,127,0.12); border: 1px solid var(--divider-color, #292929);
-        color: var(--secondary-text-color, #a3a3a3);
+      /* ---------- <1024px: preview toggle + horizontal nav ---------- */
+      .te-preview-toggle { display: none; }
+      @container te (max-width: 1023px) {
+        .te-workspace { position: relative; flex-wrap: wrap; }
+        .te-nav { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #1e2c34; padding: 8px; }
+        .te-nav-row { width: auto; white-space: nowrap; }
+        .te-preview-col {
+          position: absolute; top: 0; left: 0; right: 0; width: auto; z-index: 5;
+          max-height: 0; overflow: hidden; border-bottom: 1px solid #1e2c34;
+          transition: max-height 200ms ease;
+        }
+        .te-preview-col.open { max-height: 70vh; }
+        .te-preview-toggle {
+          display: block; margin: 0 0 14px; height: 32px; padding: 0 12px; border-radius: 6px;
+          border: 1px solid #2c3d47; background: var(--te-surface); color: #c4d3dc; font-size: 12.5px;
+        }
       }
-      .vg-copy-class:hover { background: rgba(127,127,127,0.22); }
 
-      /* Background comparison gallery */
-      .bgg-grid {
-        display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 12px; margin-top: 8px;
-      }
-      .bgg-thumb {
-        /* Same containing-block trick as .preview-wrap: each thumbnail must contain its
-           own position:fixed background pseudo-element, or it would escape to the real
-           browser viewport instead of staying inside this small box. */
-        transform: translateZ(0);
-        height: 110px; border-radius: 8px; overflow: hidden; cursor: pointer;
-        border: 1px solid var(--divider-color, #333);
-        display: flex; align-items: flex-end;
-      }
-      .bgg-thumb:hover { border-color: var(--primary-color, #03a9f4); }
-      .bgg-thumb-label {
-        position: relative; z-index: 1; width: 100%; padding: 6px 8px;
-        font-size: 11px; font-weight: 600; color: var(--primary-text-color, #fff);
-        background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
-      }
-      .adv-divider { height: 1px; background: var(--divider-color, #292929); margin: 16px 0; }
-      .adv-subheading { font-size: 14px; font-weight: 600; }
-
-
-      /* Import dialog */
-      .overlay {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-        display: flex; align-items: center; justify-content: center; z-index: 10;
-      }
-      .dialog {
-        background: var(--card-background-color, #1e1e1e); color: var(--primary-text-color, #fff);
-        padding: 18px; border-radius: 10px; width: min(480px, 90vw);
-        display: flex; flex-direction: column; gap: 10px;
-      }
-      .dialog-wide { width: min(560px, 92vw); }
-      .dialog-title { font-size: 16px; font-weight: 600; }
-      .dialog-sub { font-size: 12px; color: var(--secondary-text-color, #888); }
-      .dialog textarea {
-        width: 100%; box-sizing: border-box; font-family: monospace; font-size: 12px;
-        background: var(--primary-background-color, #111); color: inherit;
-        border: 1px solid var(--divider-color, #444); border-radius: 6px; padding: 8px;
-        resize: vertical;
-      }
-      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
-
-      .preset-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
-      .preset-item {
-        display: flex; align-items: center; gap: 10px;
-        border: 1px solid var(--divider-color, #444); border-radius: 8px; padding: 8px 10px;
-      }
-      .preset-swatches { display: flex; flex-shrink: 0; }
-      .preset-swatch {
-        width: 16px; height: 16px; border-radius: 50%;
-        border: 1px solid rgba(255,255,255,0.2);
-        margin-left: -6px;
-      }
-      .preset-swatch:first-child { margin-left: 0; }
-      .preset-info { flex: 1; min-width: 0; }
-      .preset-name { font-size: 13px; font-weight: 600; }
-      .preset-desc { font-size: 11px; color: var(--secondary-text-color, #888); }
-
-      .adv-controls { display: flex; flex-direction: column; gap: 12px; }
-      .adv-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-      .adv-row:has(> input[type="checkbox"]) { flex-direction: row; align-items: center; gap: 8px; }
-      .adv-row select, .adv-row input[type="range"] { width: 100%; }
-      .adv-row select {
-        padding: 6px 8px; border-radius: 6px; border: 1px solid var(--divider-color, #444);
-        background: var(--primary-background-color, #111); color: inherit;
-      }
-      .adv-yaml-label { font-size: 12px; color: var(--secondary-text-color, #888); margin-top: 4px; }
-      .adv-checkbox-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 4px;
-      }
-      .adv-checkbox-grid label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: normal; }
-      @media (max-width: 420px) { .adv-checkbox-grid { grid-template-columns: 1fr; } }
-      #adv-yaml-out {
-        width: 100%; box-sizing: border-box; font-family: monospace; font-size: 11px;
-        background: var(--primary-background-color, #111); color: inherit;
-        border: 1px solid var(--divider-color, #444); border-radius: 6px; padding: 8px;
-        resize: vertical;
-      }
-      .dialog-sub code {
-        background: rgba(127,127,127,0.15); padding: 1px 5px; border-radius: 4px;
-        font-family: monospace; font-size: 11px; white-space: pre;
+      @media (prefers-reduced-motion: reduce) {
+        .te-preview-frame[class*="theme-editor-bg-"] .bg-preview-style,
+        .bgg-thumb, .te-bg-stage {
+          animation: none !important;
+        }
+        * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
       }
     `;
   }
@@ -3060,7 +3071,6 @@ class ThemeEditorCard extends HTMLElement {
 
 customElements.define("theme-editor-card", ThemeEditorCard);
 
-// Register with HACS/Lovelace card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "theme-editor-card",

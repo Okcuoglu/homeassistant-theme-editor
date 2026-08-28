@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.8.0";
+const CARD_VERSION = "1.9.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -1097,12 +1097,433 @@ const TOGGLE_STYLE_LABELS = {
   "neon-track": "Neon glow track",
 };
 
+// Dashboard background animations - a DIFFERENT card-mod injection point
+// (card-mod-view, not card-mod-card) since these style the whole view
+// behind all cards, not individual cards. Pure CSS, transform/opacity
+// driven, colors only via approved theme vars - validated against those
+// constraints before being added here (brace balance, no hardcoded hex,
+// no filter:blur, no external assets, every animation >= 8s).
+const BACKGROUND_ANIMATIONS = [
+  {
+    id: "phosphor-sweep",
+    name: "Phosphor Sweep",
+    description: "A bright band slowly travels top to bottom, like a CRT screen refresh.",
+  },
+  {
+    id: "raster-puls",
+    name: "Raster Pulse",
+    description: "A fine grid gently pulses in opacity, like an instrument on standby.",
+  },
+  {
+    id: "staub-im-licht",
+    name: "Dust in Light",
+    description: "Soft light patches drift slowly, like dust particles in a sunbeam.",
+  },
+  {
+    id: "planquadrat",
+    name: "Blueprint Grid",
+    description: "Two grid layers drift at different speeds, like a technical drawing in motion.",
+  },
+  {
+    id: "leiterbahn",
+    name: "Circuit Trace",
+    description: "A light pulse travels horizontally across a fine circuit-trace pattern.",
+  },
+  {
+    id: "interferenz",
+    name: "Interference",
+    description: "Two overlaid line grids create a subtle moiré flicker.",
+  },
+  {
+    id: "reaktorring",
+    name: "Reactor Ring",
+    description: "Concentric rings and a rotating light cone, like a reactor core.",
+  },
+  {
+    id: "peilkreuz",
+    name: "Crosshair",
+    description: "Rings and a crosshair gently pulse, like a direction-finder on standby.",
+  },
+  {
+    id: "azimut",
+    name: "Azimuth",
+    description: "A degree ring rotates very slowly, like a radar or compass display.",
+  },
+  {
+    id: "fensterlicht",
+    name: "Window Light",
+    description: "Soft light breathes gently from one corner, like daylight through a window.",
+  },
+  {
+    id: "leinenzug",
+    name: "Linen Weave",
+    description: "A fine crosshatch drifts slowly, like the texture of woven linen.",
+  },
+];
+
+// Raw CSS per background id: keyframes + a class-scoped rule set (the class
+// name IS the id, prefixed). Kept class-scoped (not auto-applied) so the
+// same block works two ways: (1) theme-wide via card-mod-view + per-view
+// `card_mod: class: theme-editor-bg-<id>`, or (2) pasted directly as a
+// single view's own `card_mod: style:` block. See _buildBackgroundYaml().
+const BACKGROUND_ANIMATION_CSS = {
+  "phosphor-sweep": `@keyframes theme-editor-bg-phosphor-sweep {
+      0%   { transform: translate3d(0, -120%, 0); }
+      100% { transform: translate3d(0, 320%, 0); }
+    }
+    .theme-editor-bg-phosphor-sweep {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-phosphor-sweep::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 38vh;
+      z-index: -1;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        color-mix(in srgb, var(--primary-color) 16%, transparent) 50%,
+        transparent 100%
+      );
+      animation: theme-editor-bg-phosphor-sweep 22s linear infinite;
+      will-change: transform;
+    }`,
+  "raster-puls": `@keyframes theme-editor-bg-raster-puls {
+      0%, 100% { opacity: 0.35; }
+      50%      { opacity: 0.95; }
+    }
+    .theme-editor-bg-raster-puls {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-raster-puls::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        repeating-linear-gradient(0deg,
+          color-mix(in srgb, var(--primary-color) 14%, transparent) 0 1px,
+          transparent 1px 32px),
+        repeating-linear-gradient(90deg,
+          color-mix(in srgb, var(--primary-color) 14%, transparent) 0 1px,
+          transparent 1px 32px);
+      animation: theme-editor-bg-raster-puls 14s ease-in-out infinite;
+      will-change: opacity;
+    }`,
+  "staub-im-licht": `@keyframes theme-editor-bg-staub-im-licht {
+      0%   { transform: translate3d(-2%, 1%, 0) scale(1.04); }
+      50%  { transform: translate3d(2%, -2%, 0) scale(1.10); }
+      100% { transform: translate3d(-2%, 1%, 0) scale(1.04); }
+    }
+    .theme-editor-bg-staub-im-licht {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-staub-im-licht::before {
+      content: "";
+      position: fixed;
+      inset: -12%;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 18% 28%, color-mix(in srgb, var(--light-primary-color) 20%, transparent) 0, transparent 26%),
+        radial-gradient(circle at 72% 18%, color-mix(in srgb, var(--accent-color) 14%, transparent) 0, transparent 22%),
+        radial-gradient(circle at 40% 78%, color-mix(in srgb, var(--primary-color) 16%, transparent) 0, transparent 30%),
+        radial-gradient(circle at 88% 66%, color-mix(in srgb, var(--light-primary-color) 12%, transparent) 0, transparent 20%);
+      animation: theme-editor-bg-staub-im-licht 40s ease-in-out infinite;
+      will-change: transform;
+    }`,
+  planquadrat: `@keyframes theme-editor-bg-planquadrat-fein {
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-48px, -48px, 0); }
+    }
+    @keyframes theme-editor-bg-planquadrat-grob {
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(24px, 24px, 0); }
+    }
+    .theme-editor-bg-planquadrat {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-planquadrat::before,
+    .theme-editor-bg-planquadrat::after {
+      content: "";
+      position: fixed;
+      inset: -64px;
+      z-index: -1;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .theme-editor-bg-planquadrat::before {
+      background-image:
+        repeating-linear-gradient(0deg,
+          color-mix(in srgb, var(--primary-color) 10%, transparent) 0 1px,
+          transparent 1px 24px),
+        repeating-linear-gradient(90deg,
+          color-mix(in srgb, var(--primary-color) 10%, transparent) 0 1px,
+          transparent 1px 24px);
+      animation: theme-editor-bg-planquadrat-fein 30s linear infinite;
+    }
+    .theme-editor-bg-planquadrat::after {
+      background-image:
+        repeating-linear-gradient(0deg,
+          color-mix(in srgb, var(--accent-color) 12%, transparent) 0 1px,
+          transparent 1px 120px),
+        repeating-linear-gradient(90deg,
+          color-mix(in srgb, var(--accent-color) 12%, transparent) 0 1px,
+          transparent 1px 120px);
+      animation: theme-editor-bg-planquadrat-grob 45s linear infinite;
+    }`,
+  leiterbahn: `@keyframes theme-editor-bg-leiterbahn {
+      0%   { transform: translate3d(-40%, 0, 0); }
+      100% { transform: translate3d(140%, 0, 0); }
+    }
+    .theme-editor-bg-leiterbahn {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-leiterbahn::before,
+    .theme-editor-bg-leiterbahn::after {
+      content: "";
+      position: fixed;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .theme-editor-bg-leiterbahn::before {
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg,
+          color-mix(in srgb, var(--primary-color) 11%, transparent) 0 2px,
+          transparent 2px 56px),
+        repeating-linear-gradient(90deg,
+          color-mix(in srgb, var(--primary-color) 7%, transparent) 0 2px,
+          transparent 2px 140px);
+    }
+    .theme-editor-bg-leiterbahn::after {
+      inset: 0 auto 0 0;
+      width: 30vw;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--accent-color) 22%, transparent) 55%,
+        transparent 100%);
+      animation: theme-editor-bg-leiterbahn 26s linear infinite;
+      will-change: transform;
+    }`,
+  interferenz: `@keyframes theme-editor-bg-interferenz {
+      0%   { transform: rotate(0.6deg) scale(1.08); }
+      50%  { transform: rotate(4.2deg) scale(1.08); }
+      100% { transform: rotate(0.6deg) scale(1.08); }
+    }
+    .theme-editor-bg-interferenz {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-interferenz::before,
+    .theme-editor-bg-interferenz::after {
+      content: "";
+      position: fixed;
+      inset: -25%;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .theme-editor-bg-interferenz::before {
+      background-image: repeating-linear-gradient(0deg,
+        color-mix(in srgb, var(--primary-color) 9%, transparent) 0 1px,
+        transparent 1px 8px);
+    }
+    .theme-editor-bg-interferenz::after {
+      background-image: repeating-linear-gradient(0deg,
+        color-mix(in srgb, var(--light-primary-color) 9%, transparent) 0 1px,
+        transparent 1px 8px);
+      animation: theme-editor-bg-interferenz 36s ease-in-out infinite;
+      will-change: transform;
+    }`,
+  reaktorring: `@keyframes theme-editor-bg-reaktorring-ringe {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes theme-editor-bg-reaktorring-sweep {
+      0%   { transform: rotate(360deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .theme-editor-bg-reaktorring {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-reaktorring::before,
+    .theme-editor-bg-reaktorring::after {
+      content: "";
+      position: fixed;
+      inset: -40vmax;
+      border-radius: 50%;
+      z-index: -1;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .theme-editor-bg-reaktorring::before {
+      background-image: repeating-radial-gradient(circle at 50% 50%,
+        transparent 0 46px,
+        color-mix(in srgb, var(--primary-color) 13%, transparent) 46px 47px,
+        transparent 47px 92px);
+      animation: theme-editor-bg-reaktorring-ringe 90s linear infinite;
+    }
+    .theme-editor-bg-reaktorring::after {
+      background-image: conic-gradient(from 0deg,
+        transparent 0deg 300deg,
+        color-mix(in srgb, var(--accent-color) 16%, transparent) 340deg,
+        transparent 360deg);
+      animation: theme-editor-bg-reaktorring-sweep 28s linear infinite;
+    }`,
+  peilkreuz: `@keyframes theme-editor-bg-peilkreuz {
+      0%, 100% { transform: scale(1); opacity: 0.55; }
+      50%      { transform: scale(1.06); opacity: 1; }
+    }
+    .theme-editor-bg-peilkreuz {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-peilkreuz::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        radial-gradient(circle at 50% 50%,
+          transparent 0 22vmin,
+          color-mix(in srgb, var(--primary-color) 15%, transparent) 22vmin calc(22vmin + 1px),
+          transparent calc(22vmin + 1px) 100%),
+        radial-gradient(circle at 50% 50%,
+          transparent 0 30vmin,
+          color-mix(in srgb, var(--primary-color) 9%, transparent) 30vmin calc(30vmin + 2px),
+          transparent calc(30vmin + 2px) 100%),
+        linear-gradient(90deg, transparent calc(50% - 0.5px),
+          color-mix(in srgb, var(--accent-color) 12%, transparent) calc(50% - 0.5px) calc(50% + 0.5px),
+          transparent calc(50% + 0.5px)),
+        linear-gradient(0deg, transparent calc(50% - 0.5px),
+          color-mix(in srgb, var(--accent-color) 12%, transparent) calc(50% - 0.5px) calc(50% + 0.5px),
+          transparent calc(50% + 0.5px));
+      animation: theme-editor-bg-peilkreuz 20s ease-in-out infinite;
+      will-change: transform, opacity;
+    }`,
+  azimut: `@keyframes theme-editor-bg-azimut {
+      0%   { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    .theme-editor-bg-azimut {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-azimut::before {
+      content: "";
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 60vmin;
+      height: 60vmin;
+      border-radius: 50%;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        repeating-conic-gradient(from 0deg at 50% 50%,
+          color-mix(in srgb, var(--primary-color) 20%, transparent) 0deg 0.5deg,
+          transparent 0.5deg 6deg),
+        radial-gradient(circle at 50% 50%,
+          transparent 0 29.4%,
+          color-mix(in srgb, var(--accent-color) 20%, transparent) 29.4% 30%,
+          transparent 30% 40%,
+          color-mix(in srgb, var(--accent-color) 14%, transparent) 40% 40.5%,
+          transparent 40.5% 100%);
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 32% 39%, transparent 40.5%);
+      mask-image: radial-gradient(circle at 50% 50%, transparent 0 30%, #000 32% 39%, transparent 40.5%);
+      animation: theme-editor-bg-azimut 120s linear infinite;
+      will-change: transform;
+    }`,
+  fensterlicht: `@keyframes theme-editor-bg-fensterlicht {
+      0%, 100% { transform: scale(1) translate3d(0, 0, 0); opacity: 0.55; }
+      50%      { transform: scale(1.18) translate3d(2%, -1%, 0); opacity: 1; }
+    }
+    .theme-editor-bg-fensterlicht {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-fensterlicht::before {
+      content: "";
+      position: fixed;
+      inset: -20%;
+      z-index: -1;
+      pointer-events: none;
+      transform-origin: 22% 12%;
+      background: radial-gradient(ellipse 70% 60% at 22% 12%,
+        color-mix(in srgb, var(--accent-color) 18%, transparent) 0%,
+        color-mix(in srgb, var(--primary-color) 8%, transparent) 45%,
+        transparent 72%);
+      animation: theme-editor-bg-fensterlicht 34s ease-in-out infinite;
+      will-change: transform, opacity;
+    }`,
+  leinenzug: `@keyframes theme-editor-bg-leinenzug {
+      0%   { transform: translate3d(0, 0, 0); }
+      100% { transform: translate3d(-56px, -32px, 0); }
+    }
+    .theme-editor-bg-leinenzug {
+      position: relative;
+      background: var(--primary-background-color);
+    }
+    .theme-editor-bg-leinenzug::before {
+      content: "";
+      position: fixed;
+      inset: -64px;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        repeating-linear-gradient(58deg,
+          color-mix(in srgb, var(--primary-color) 8%, transparent) 0 1px,
+          transparent 1px 7px),
+        repeating-linear-gradient(148deg,
+          color-mix(in srgb, var(--dark-primary-color) 6%, transparent) 0 1px,
+          transparent 1px 9px);
+      animation: theme-editor-bg-leinenzug 38s linear infinite;
+      will-change: transform;
+    }`,
+};
+
+function buildBackgroundYaml(backgroundId) {
+  if (!backgroundId || backgroundId === "none" || !BACKGROUND_ANIMATION_CSS[backgroundId]) return "";
+  const css = BACKGROUND_ANIMATION_CSS[backgroundId];
+  const lines = [];
+  lines.push(`# Separate injection point - do NOT merge into card-mod-card above.`);
+  lines.push(`# Two ways to use this:`);
+  lines.push(`#`);
+  lines.push(`# A) Theme-wide, opt-in per view: paste the whole block below into your theme`);
+  lines.push(`#    file under "card-mod-view:", then on any view you want animated, add:`);
+  lines.push(`#      card_mod:`);
+  lines.push(`#        class: theme-editor-bg-${backgroundId}`);
+  lines.push(`#`);
+  lines.push(`# B) Single view only, no theme change: open that view's raw config and add`);
+  lines.push(`#    directly (skip the "card-mod-view:" line, keep everything after it):`);
+  lines.push(`#      card_mod:`);
+  lines.push(`#        style: |`);
+  lines.push(`#          <the CSS below, with .theme-editor-bg-${backgroundId} replaced by :host>`);
+  lines.push(`card-mod-view: |`);
+  for (const line of css.split("\n")) {
+    lines.push(`  ${line}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+
 const DEFAULT_ADVANCED_STATE = {
   hoverElevate: true,
   variant: "elevated",
   toggleStyle: "default",
   animations: { glowPulse: false, shimmer: false, rotatingBorder: false, ripple: false },
   transitionMs: 200,
+  background: "none",
 };
 
 const HOLO_PULSE_KEYFRAMES = `@keyframes theme-editor-holo-pulse {
@@ -1438,6 +1859,7 @@ class ThemeEditorCard extends HTMLElement {
     `;
     this._applyPreviewVars();
     this._applyAdvancedPreview();
+    this._applyBackgroundPreview();
     this._bindEvents();
     this._bindAdvancedControls();
   }
@@ -1565,6 +1987,31 @@ class ThemeEditorCard extends HTMLElement {
       wrap.appendChild(styleEl);
     }
     styleEl.textContent = buildPreviewAdvancedCss(this._advanced);
+  }
+
+  // Applies the selected background animation's class + CSS to the preview
+  // container itself (which is the containing block for position:fixed,
+  // per the transform on .preview-wrap - see its CSS comment).
+  _applyBackgroundPreview() {
+    const wrap = this.shadowRoot.getElementById("preview-wrap");
+    if (!wrap) return;
+    for (const cls of [...wrap.classList]) {
+      if (cls.startsWith("theme-editor-bg-")) wrap.classList.remove(cls);
+    }
+    let styleEl = wrap.querySelector("#bg-preview-style");
+    const bgId = this._advanced.background;
+    const css = bgId && BACKGROUND_ANIMATION_CSS[bgId];
+    if (!css) {
+      if (styleEl) styleEl.textContent = "";
+      return;
+    }
+    wrap.classList.add(`theme-editor-bg-${bgId}`);
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "bg-preview-style";
+      wrap.appendChild(styleEl);
+    }
+    styleEl.textContent = css;
   }
 
   /* ---------------- events ---------------- */
@@ -1763,6 +2210,39 @@ class ThemeEditorCard extends HTMLElement {
       <div class="adv-actions">
         <button class="btn" id="adv-copy">Copy YAML</button>
       </div>
+
+      <div class="adv-divider"></div>
+
+      <div class="dialog-title-row">
+        <div class="adv-subheading">Background Animation</div>
+        <button class="btn-flat btn-small" id="bg-compare">⇔ Compare backgrounds</button>
+      </div>
+      <div class="dialog-sub">
+        A DIFFERENT injection point than the card shapes above (<code>card-mod-view</code>
+        instead of <code>card-mod-card</code>) - this styles the whole dashboard view behind
+        every card, not individual cards. Pure CSS, slow and subtle by design so it doesn't
+        fight with your cards for attention or tax weaker displays (e.g. a wall-mounted tablet).
+      </div>
+
+      <div class="adv-controls">
+        <label class="adv-row">
+          <span>Style</span>
+          <select id="adv-background">
+            <option value="none" ${a.background === "none" ? "selected" : ""}>None</option>
+            ${BACKGROUND_ANIMATIONS.map(
+              (b) => `<option value="${b.id}" ${a.background === b.id ? "selected" : ""}>${b.name}</option>`
+            ).join("")}
+          </select>
+        </label>
+      </div>
+      ${
+        a.background !== "none"
+          ? `<div class="dialog-sub">${BACKGROUND_ANIMATIONS.find((b) => b.id === a.background)?.description || ""}</div>
+             <div class="adv-yaml-label">Paste into your theme file (separate from the card shape YAML above):</div>
+             <textarea id="bg-yaml-out" rows="10" readonly></textarea>
+             <div class="adv-actions"><button class="btn" id="bg-copy">Copy YAML</button></div>`
+          : ""
+      }
     `;
   }
 
@@ -1824,6 +2304,35 @@ class ThemeEditorCard extends HTMLElement {
         // clipboard API unavailable - user can select the textarea manually
       }
     });
+
+    root.getElementById("adv-background").addEventListener("change", (e) => {
+      this._advanced.background = e.target.value;
+      this._saveToStorage();
+      this._render(); // background YAML textarea appears/disappears - needs a full re-render
+    });
+
+    const bgOut = root.getElementById("bg-yaml-out");
+    if (bgOut) bgOut.value = buildBackgroundYaml(this._advanced.background);
+
+    const bgCopyBtn = root.getElementById("bg-copy");
+    if (bgCopyBtn) {
+      bgCopyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(bgOut.value);
+          bgCopyBtn.textContent = "Copied!";
+          setTimeout(() => {
+            if (root.getElementById("bg-copy")) root.getElementById("bg-copy").textContent = "Copy YAML";
+          }, 2000);
+        } catch (e) {
+          // clipboard API unavailable - user can select the textarea manually
+        }
+      });
+    }
+
+    const bgCompareBtn = root.getElementById("bg-compare");
+    if (bgCompareBtn) bgCompareBtn.addEventListener("click", () => this._openBackgroundGalleryDialog());
+
+    this._applyBackgroundPreview();
   }
 
   _openVariantGalleryDialog() {
@@ -1889,6 +2398,55 @@ class ThemeEditorCard extends HTMLElement {
         } catch (err) {
           // clipboard unavailable - non-fatal, button still shows the value to copy manually
         }
+      });
+    });
+  }
+
+  _openBackgroundGalleryDialog() {
+    const existing = this.shadowRoot.getElementById("bg-gallery-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "bg-gallery-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="dialog dialog-full">
+        <div class="dialog-title-row">
+          <div class="dialog-title">Compare Backgrounds</div>
+          <button class="btn-flat btn-small" id="bgg-close">Close</button>
+        </div>
+        <div class="dialog-sub">
+          All ${BACKGROUND_ANIMATIONS.length} background animations, contained to their own
+          thumbnail here for comparison (on a real dashboard each one fills the whole screen
+          behind your cards). Click one to select it and generate its YAML.
+        </div>
+        <div class="bgg-grid" id="bgg-grid">
+          ${BACKGROUND_ANIMATIONS.map(
+            (b) => `
+            <div class="bgg-thumb theme-editor-bg-${b.id}" data-bg="${b.id}">
+              <div class="bgg-thumb-label">${b.name}</div>
+            </div>
+          `
+          ).join("")}
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+
+    const dialogEl = overlay.querySelector(".dialog-full");
+    this._applyVarsToElement(dialogEl, this._computeEffectiveVars());
+
+    const styleTag = document.createElement("style");
+    styleTag.textContent = Object.values(BACKGROUND_ANIMATION_CSS).join("\n");
+    overlay.appendChild(styleTag);
+
+    overlay.querySelector("#bgg-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelectorAll(".bgg-thumb").forEach((thumb) => {
+      thumb.addEventListener("click", () => {
+        this._advanced.background = thumb.dataset.bg;
+        this._saveToStorage();
+        overlay.remove();
+        this._render();
       });
     });
   }
@@ -2242,6 +2800,12 @@ class ThemeEditorCard extends HTMLElement {
       .preview-wrap {
         margin-bottom: 18px; border-radius: 8px; overflow: hidden;
         border: 1px solid var(--divider-color, #333);
+        /* Background animations use position:fixed (correct for a real dashboard, which
+           should fill the whole viewport). transform establishes a new containing block
+           per spec, so fixed-position descendants are confined to THIS box in our preview
+           instead of covering the real browser window. */
+        transform: translateZ(0);
+        position: relative;
       }
       .preview-wrap.mobile { display: flex; justify-content: center; padding: 16px; background: rgba(0,0,0,0.15); }
       .preview-wrap.mobile .mockup {
@@ -2404,6 +2968,29 @@ class ThemeEditorCard extends HTMLElement {
         color: var(--secondary-text-color, #a3a3a3);
       }
       .vg-copy-class:hover { background: rgba(127,127,127,0.22); }
+
+      /* Background comparison gallery */
+      .bgg-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px; margin-top: 8px;
+      }
+      .bgg-thumb {
+        /* Same containing-block trick as .preview-wrap: each thumbnail must contain its
+           own position:fixed background pseudo-element, or it would escape to the real
+           browser viewport instead of staying inside this small box. */
+        transform: translateZ(0);
+        height: 110px; border-radius: 8px; overflow: hidden; cursor: pointer;
+        border: 1px solid var(--divider-color, #333);
+        display: flex; align-items: flex-end;
+      }
+      .bgg-thumb:hover { border-color: var(--primary-color, #03a9f4); }
+      .bgg-thumb-label {
+        position: relative; z-index: 1; width: 100%; padding: 6px 8px;
+        font-size: 11px; font-weight: 600; color: var(--primary-text-color, #fff);
+        background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+      }
+      .adv-divider { height: 1px; background: var(--divider-color, #292929); margin: 16px 0; }
+      .adv-subheading { font-size: 14px; font-weight: 600; }
 
 
       /* Import dialog */

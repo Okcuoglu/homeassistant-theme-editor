@@ -46,6 +46,15 @@ started, no restart needed to try ideas.
   entities list, alarm panel, camera, button card, gauge, status badges)
   all styled with your current theme, so you're not limited to the one
   sample card in the main preview
+- 🌌 **Dashboard Background Animations** - a separate section below the
+  card shapes, since backgrounds use a different card-mod injection point
+  (`card-mod-view`, styling the whole view behind every card, not
+  individual cards). 11 slow, subtle, pure-CSS animations (Phosphor Sweep,
+  Raster Pulse, Dust in Light, Blueprint Grid, Circuit Trace, Interference,
+  Reactor Ring, Crosshair, Azimuth, Window Light, Linen Weave) - all
+  transform/opacity-driven for performance on weaker displays (e.g. a
+  wall-mounted tablet), colors only via theme variables, with a "Compare
+  Backgrounds" gallery to preview all of them at once
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
 - 📋 **Export** via clipboard copy or `.yaml` file download

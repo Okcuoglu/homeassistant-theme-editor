@@ -19,8 +19,9 @@ started, no restart needed to try ideas.
 - 👀 **Live mockup preview** - a self-contained sample dashboard (sidebar,
   cards, toggle, slider, badges) that updates instantly as you edit, without
   touching your real dashboard
-- 📚 **Starter preset library** - three built-in themes (Warm Amber
-  Technical, Cyber Cyan, Minimal Light) to load as a jumping-off point
+- 📚 **15 built-in starter presets** across a wide range of moods - from
+  clean minimalism to warm materials to retro-technical - to load as a
+  jumping-off point
 - ✨ **Advanced (card-mod) tab** - inline, collapsible, right below the
   preview (no popup) - since animations and per-card variety need CSS
   injection, not just theme variables, this generates a ready

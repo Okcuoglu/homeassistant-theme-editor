@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.6.1";
+const CARD_VERSION = "1.7.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -1281,9 +1281,12 @@ class ThemeEditorCard extends HTMLElement {
 
         <div class="preview-toolbar">
           <span class="preview-label">Preview</span>
-          <div class="device-toggle">
-            <button class="device-btn ${this._previewDevice === "desktop" ? "active" : ""}" data-device="desktop" title="Desktop preview">🖥</button>
-            <button class="device-btn ${this._previewDevice === "mobile" ? "active" : ""}" data-device="mobile" title="Mobile preview">📱</button>
+          <div class="preview-toolbar-actions">
+            <button class="btn-flat btn-small" id="btn-full-preview">Full Preview</button>
+            <div class="device-toggle">
+              <button class="device-btn ${this._previewDevice === "desktop" ? "active" : ""}" data-device="desktop" title="Desktop preview">🖥</button>
+              <button class="device-btn ${this._previewDevice === "mobile" ? "active" : ""}" data-device="mobile" title="Mobile preview">📱</button>
+            </div>
           </div>
         </div>
         <div class="preview-wrap ${this._previewDevice === "mobile" ? "mobile" : ""}" id="preview-wrap">
@@ -1402,23 +1405,30 @@ class ThemeEditorCard extends HTMLElement {
     `;
   }
 
+  // Returns only the CSS vars the theme actually defines (base + active mode
+  // override) - unset fields are omitted so real fallback chains can apply,
+  // same as real Home Assistant only injects vars a theme specifies.
+  _computeEffectiveVars() {
+    const modeOverrides = this._activeMode ? this._modeValues[this._activeMode] : {};
+    const result = {};
+    for (const field of ALL_FIELDS) {
+      const val = modeOverrides[field.key] || this._values[field.key];
+      if (val) result[field.key] = val;
+    }
+    return result;
+  }
+
+  _applyVarsToElement(el, vars) {
+    for (const field of ALL_FIELDS) {
+      if (vars[field.key]) el.style.setProperty(`--${field.key}`, vars[field.key]);
+      else el.style.removeProperty(`--${field.key}`);
+    }
+  }
+
   _applyPreviewVars() {
     const wrap = this.shadowRoot.getElementById("preview-wrap");
     if (!wrap) return;
-    const modeOverrides = this._activeMode ? this._modeValues[this._activeMode] : {};
-    for (const field of ALL_FIELDS) {
-      const val = modeOverrides[field.key] || this._values[field.key];
-      // Only set the CSS var when the theme actually defines a value - same as real
-      // Home Assistant, which only injects variables a theme specifies. If we always
-      // forced field.default here, dependent vars like --ha-card-background would never
-      // be "unset", so their CSS var(x, var(--card-background-color, ...)) fallback
-      // chains could never kick in even when the theme only sets card-background-color.
-      if (val) {
-        wrap.style.setProperty(`--${field.key}`, val);
-      } else {
-        wrap.style.removeProperty(`--${field.key}`);
-      }
-    }
+    this._applyVarsToElement(wrap, this._computeEffectiveVars());
   }
 
   // Injects a <style> tag into the preview so card-mod's hover/variant/
@@ -1529,6 +1539,7 @@ class ThemeEditorCard extends HTMLElement {
 
     root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
     root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
+    root.getElementById("btn-full-preview").addEventListener("click", () => this._openFullPreviewDialog());
 
     root.getElementById("btn-copy").addEventListener("click", async () => {
       const yaml = buildYaml(this._themeName, this._values, this._modeValues);
@@ -1648,6 +1659,147 @@ class ThemeEditorCard extends HTMLElement {
         // clipboard API unavailable - user can select the textarea manually
       }
     });
+  }
+
+  _openFullPreviewDialog() {
+    const existing = this.shadowRoot.getElementById("full-preview-overlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "full-preview-overlay";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="dialog dialog-full">
+        <div class="dialog-title-row">
+          <div class="dialog-title">Full Preview</div>
+          <div class="dialog-title-actions">
+            <button class="btn-flat btn-small" id="fp-refresh">↻ Refresh</button>
+            <button class="btn-flat btn-small" id="fp-close">Close</button>
+          </div>
+        </div>
+        <div class="dialog-sub">
+          A snapshot of common Home Assistant card types with your current theme applied.
+          Not every possible card exists here - real dashboards have far more variety - but
+          this covers the most common ones. Hit Refresh after editing fields elsewhere to
+          re-sync this snapshot.
+        </div>
+        <div class="fp-grid" id="fp-grid">
+          ${this._fullPreviewCardsHtml()}
+        </div>
+      </div>
+    `;
+    this.shadowRoot.appendChild(overlay);
+    this._applyVarsToElement(overlay.querySelector(".dialog-full"), this._computeEffectiveVars());
+
+    overlay.querySelector("#fp-close").addEventListener("click", () => overlay.remove());
+    overlay.querySelector("#fp-refresh").addEventListener("click", () => {
+      overlay.querySelector("#fp-grid").innerHTML = this._fullPreviewCardsHtml();
+      this._applyVarsToElement(overlay.querySelector(".dialog-full"), this._computeEffectiveVars());
+    });
+  }
+
+  _fullPreviewCardsHtml() {
+    return `
+      <div class="mockup-card fp-card">
+        <div class="mockup-card-title">Living Room Light</div>
+        <div class="mockup-row">
+          <span class="mockup-label">On/Off</span>
+          <span class="mockup-toggle on"><span class="knob"></span></span>
+        </div>
+        <div class="mockup-slider"><span class="mockup-slider-fill" style="width:72%"></span></div>
+      </div>
+
+      <div class="mockup-card fp-card fp-thermostat">
+        <div class="mockup-card-title">Climate</div>
+        <div class="fp-dial">
+          <div class="fp-dial-value">21.5°</div>
+          <div class="fp-dial-sub">Heating to 22°</div>
+        </div>
+        <div class="fp-chip-row">
+          <span class="fp-chip active">Heat</span>
+          <span class="fp-chip">Cool</span>
+          <span class="fp-chip">Off</span>
+        </div>
+      </div>
+
+      <div class="mockup-card fp-card fp-weather">
+        <div class="mockup-card-title">Weather</div>
+        <div class="fp-weather-main">
+          <span class="fp-weather-icon">⛅</span>
+          <span class="fp-weather-temp">18°</span>
+        </div>
+        <div class="fp-weather-row">
+          <span>Mon 20°</span><span>Tue 17°</span><span>Wed 19°</span><span>Thu 21°</span>
+        </div>
+      </div>
+
+      <div class="mockup-card fp-card fp-media">
+        <div class="mockup-card-title">Living Room Speaker</div>
+        <div class="fp-media-row">
+          <div class="fp-media-art"></div>
+          <div class="fp-media-info">
+            <div class="fp-media-track">Song Title</div>
+            <div class="fp-media-artist">Artist Name</div>
+          </div>
+        </div>
+        <div class="mockup-slider"><span class="mockup-slider-fill" style="width:38%"></span></div>
+        <div class="fp-media-controls">⏮ &nbsp; ⏸ &nbsp; ⏭</div>
+      </div>
+
+      <div class="mockup-card fp-card fp-graph">
+        <div class="mockup-card-title">Temperature History</div>
+        <svg class="fp-sparkline" viewBox="0 0 200 60" preserveAspectRatio="none">
+          <polyline points="0,40 20,35 40,38 60,20 80,25 100,15 120,22 140,10 160,18 180,12 200,20" fill="none" stroke-width="2" />
+        </svg>
+        <div class="mockup-big-value" style="font-size:20px">21.4°C</div>
+      </div>
+
+      <div class="mockup-card fp-card fp-entities">
+        <div class="mockup-card-title">Entities</div>
+        <div class="fp-entity-row"><span class="fp-entity-icon">💡</span><span class="fp-entity-name">Kitchen Light</span><span class="mockup-toggle on"><span class="knob"></span></span></div>
+        <div class="fp-entity-row"><span class="fp-entity-icon">🌡</span><span class="fp-entity-name">Living Room Temp</span><span class="fp-entity-value">21.4°C</span></div>
+        <div class="fp-entity-row"><span class="fp-entity-icon">🔒</span><span class="fp-entity-name">Front Door</span><span class="fp-entity-value">Locked</span></div>
+      </div>
+
+      <div class="mockup-card fp-card fp-alarm">
+        <div class="mockup-card-title">Alarm</div>
+        <div class="fp-alarm-status">Armed Home</div>
+        <div class="fp-keypad">
+          ${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((n) => `<span class="fp-key">${n}</span>`).join("")}
+        </div>
+      </div>
+
+      <div class="mockup-card fp-card fp-camera">
+        <div class="mockup-card-title">Front Door Camera</div>
+        <div class="fp-camera-placeholder">📷</div>
+      </div>
+
+      <div class="mockup-card fp-card fp-button-card">
+        <div class="fp-button-icon">⏻</div>
+        <div class="fp-button-label">Garage Door</div>
+      </div>
+
+      <div class="mockup-card fp-card fp-gauge">
+        <div class="mockup-card-title">Humidity</div>
+        <div class="fp-gauge-ring"><span class="fp-gauge-value">46%</span></div>
+      </div>
+
+      <div class="mockup-card fp-card fp-badges">
+        <div class="mockup-card-title">Status &amp; Badges</div>
+        <div class="fp-badge-row">
+          <span class="mockup-badge success">Normal</span>
+          <span class="mockup-badge warning">Warning</span>
+          <span class="mockup-badge error">Error</span>
+        </div>
+        <div class="fp-badge-row">
+          <span class="fp-dot" style="background:var(--label-badge-red)"></span>
+          <span class="fp-dot" style="background:var(--label-badge-green)"></span>
+          <span class="fp-dot" style="background:var(--label-badge-blue)"></span>
+          <span class="fp-dot" style="background:var(--label-badge-yellow)"></span>
+          <span class="fp-dot" style="background:var(--label-badge-grey)"></span>
+        </div>
+      </div>
+    `;
   }
 
   _openPresetsDialog() {
@@ -1843,6 +1995,8 @@ class ThemeEditorCard extends HTMLElement {
 
       /* Live mockup preview - scoped to its own CSS vars, not the real dashboard */
       .preview-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+      .preview-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+      .btn-small { padding: 4px 10px; font-size: 12px; }
       .preview-label { font-size: 12px; color: var(--secondary-text-color, #888); text-transform: uppercase; letter-spacing: 0.04em; }
       .device-toggle { display: flex; border: 1px solid var(--divider-color, #444); border-radius: 6px; overflow: hidden; }
       .device-btn {
@@ -1922,6 +2076,94 @@ class ThemeEditorCard extends HTMLElement {
       .mockup-badge.success { color: var(--success-color, #43a047); border-color: var(--success-color, #43a047); }
       .mockup-badge.warning { color: var(--warning-color, #ffa600); border-color: var(--warning-color, #ffa600); }
       .mockup-badge.error { color: var(--error-color, #db4437); border-color: var(--error-color, #db4437); }
+
+      /* Full Preview dialog */
+      .dialog-full { width: min(960px, 96vw); max-height: 88vh; overflow-y: auto; }
+      .dialog-title-row { display: flex; align-items: center; justify-content: space-between; }
+      .dialog-title-actions { display: flex; gap: 8px; }
+      .fp-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px; margin-top: 8px;
+      }
+      .fp-card { color: var(--primary-text-color, #fff); }
+
+      /* Thermostat */
+      .fp-dial {
+        width: 96px; height: 96px; border-radius: 50%; margin: 8px auto;
+        border: 4px solid var(--primary-color, #03a9f4);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+      }
+      .fp-dial-value { font-size: 20px; font-weight: 700; }
+      .fp-dial-sub { font-size: 10px; color: var(--secondary-text-color, #a3a3a3); text-align: center; }
+      .fp-chip-row { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+      .fp-chip {
+        font-size: 10px; padding: 3px 8px; border-radius: 10px;
+        border: 1px solid var(--divider-color, #292929); color: var(--secondary-text-color, #a3a3a3);
+      }
+      .fp-chip.active { background: var(--primary-color, #03a9f4); color: white; border-color: var(--primary-color, #03a9f4); }
+
+      /* Weather */
+      .fp-weather-main { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+      .fp-weather-icon { font-size: 28px; }
+      .fp-weather-temp { font-size: 26px; font-weight: 700; }
+      .fp-weather-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--secondary-text-color, #a3a3a3); }
+
+      /* Media player */
+      .fp-media-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+      .fp-media-art { width: 40px; height: 40px; border-radius: 6px; background: var(--accent-color, #ff9800); flex-shrink: 0; }
+      .fp-media-track { font-size: 13px; font-weight: 600; }
+      .fp-media-artist { font-size: 11px; color: var(--secondary-text-color, #a3a3a3); }
+      .fp-media-controls { text-align: center; margin-top: 8px; font-size: 16px; letter-spacing: 4px; }
+
+      /* Graph / sparkline */
+      .fp-sparkline { width: 100%; height: 44px; margin: 6px 0; }
+      .fp-sparkline polyline { stroke: var(--primary-color, #03a9f4); }
+
+      /* Entities list */
+      .fp-entity-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; }
+      .fp-entity-icon { flex-shrink: 0; }
+      .fp-entity-name { flex: 1; }
+      .fp-entity-value { color: var(--secondary-text-color, #a3a3a3); }
+
+      /* Alarm */
+      .fp-alarm-status {
+        text-align: center; font-size: 12px; font-weight: 600; margin: 6px 0;
+        color: var(--state-active-color, #03a9f4);
+      }
+      .fp-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+      .fp-key {
+        text-align: center; padding: 6px 0; font-size: 12px; border-radius: 4px;
+        background: var(--secondary-background-color, #1c1c1c); color: var(--primary-text-color, #fff);
+      }
+
+      /* Camera */
+      .fp-camera-placeholder {
+        height: 90px; border-radius: 6px; background: var(--secondary-background-color, #1c1c1c);
+        display: flex; align-items: center; justify-content: center; font-size: 26px; opacity: 0.6;
+      }
+
+      /* Button card */
+      .fp-button-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 90px; }
+      .fp-button-icon { font-size: 26px; color: var(--state-icon-active-color, #03a9f4); }
+      .fp-button-label { font-size: 12px; }
+
+      /* Gauge */
+      .fp-gauge-ring {
+        width: 90px; height: 90px; border-radius: 50%; margin: 8px auto;
+        background: conic-gradient(var(--primary-color, #03a9f4) 46%, var(--divider-color, #292929) 0);
+        display: flex; align-items: center; justify-content: center;
+      }
+      .fp-gauge-ring::before {
+        content: ""; position: absolute; width: 66px; height: 66px; border-radius: 50%;
+        background: var(--ha-card-background, var(--card-background-color, #1e1e1e));
+      }
+      .fp-gauge-ring { position: relative; }
+      .fp-gauge-value { position: relative; z-index: 1; font-size: 15px; font-weight: 700; }
+
+      /* Badges card */
+      .fp-badge-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+      .fp-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
 
       /* Import dialog */
       .overlay {

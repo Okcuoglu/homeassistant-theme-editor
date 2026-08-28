@@ -33,6 +33,11 @@ started, no restart needed to try ideas.
   the exact same CSS that gets exported
 - 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
   phone-width layout, not just desktop
+- 🖼️ **Full Preview** - a snapshot popup showing 11 common Home Assistant
+  card types (light, thermostat, weather, media player, history graph,
+  entities list, alarm panel, camera, button card, gauge, status badges)
+  all styled with your current theme, so you're not limited to the one
+  sample card in the main preview
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
 - 📋 **Export** via clipboard copy or `.yaml` file download

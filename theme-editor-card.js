@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.2";
+const CARD_VERSION = "2.0.4";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -1729,7 +1729,6 @@ class ThemeEditorCard extends HTMLElement {
     this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
     this._themeName = "my_custom_theme";
     this._activeSection = "advanced";
-    this._showYaml = false;
     this._yamlTab = "vars"; // "vars" | "card" | "background"
     this._dirtyCount = 0;
     this._navMobileOpen = false; // <1024px: preview becomes a collapsible panel
@@ -1878,6 +1877,38 @@ class ThemeEditorCard extends HTMLElement {
     return String(str).replace(/"/g, "&quot;");
   }
 
+  // Robust clipboard copy: the modern navigator.clipboard API silently
+  // throws (or is entirely undefined) outside a "secure context" - e.g.
+  // Home Assistant served over plain HTTP/LAN IP without HTTPS set up yet,
+  // or inside certain embeds. Falls back to the older execCommand approach
+  // via a temporary textarea, which works over HTTP too. Returns true/false
+  // so callers can show real success/failure feedback instead of guessing.
+  async _copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (e) {
+        // fall through to legacy fallback below
+      }
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /* ---------------- rendering ---------------- */
 
   _render() {
@@ -1895,7 +1926,6 @@ class ThemeEditorCard extends HTMLElement {
             </div>
             ${this._previewColumnHtml()}
           </div>
-          ${this._showYaml ? this._yamlDrawerHtml() : ""}
         </div>
       </ha-card>
     `;
@@ -2185,22 +2215,32 @@ class ThemeEditorCard extends HTMLElement {
     `;
   }
 
-  _yamlDrawerHtml() {
+  _yamlTabText(tab) {
+    if (tab === "card") return buildCardModSnippet(this._themeName, this._advanced);
+    if (tab === "background") {
+      return (
+        buildBackgroundYaml(this._advanced.background) ||
+        "# No background animation selected.\n# Pick one under Advanced → View Background."
+      );
+    }
+    return buildYaml(this._themeName, this._values, this._modeValues);
+  }
+
+  _openYamlDialog() {
+    const existing = this.shadowRoot.getElementById("yaml-overlay");
+    if (existing) existing.remove();
+
     const tabs = [
       { id: "vars", label: "Variables" },
       { id: "card", label: "Card Shape" },
       { id: "background", label: "Background" },
     ];
-    let text;
-    if (this._yamlTab === "card") {
-      text = buildCardModSnippet(this._themeName, this._advanced);
-    } else if (this._yamlTab === "background") {
-      text = buildBackgroundYaml(this._advanced.background) || "# No background animation selected.\n# Pick one under Advanced → View Background.";
-    } else {
-      text = buildYaml(this._themeName, this._values, this._modeValues);
-    }
-    return `
-      <div class="te-yaml-drawer">
+
+    const overlay = document.createElement("div");
+    overlay.id = "yaml-overlay";
+    overlay.className = "te-overlay";
+    overlay.innerHTML = `
+      <div class="te-dialog te-dialog-yaml">
         <div class="te-yaml-head">
           <div class="te-seg" id="yaml-tab-seg">
             ${tabs.map((t) => `<button data-yaml-tab="${t.id}" class="${this._yamlTab === t.id ? "on" : ""}">${t.label}</button>`).join("")}
@@ -2211,9 +2251,55 @@ class ThemeEditorCard extends HTMLElement {
           <button class="te-btn te-btn-small" id="yaml-download">Load .yaml</button>
           <button class="te-btn te-btn-icon" id="yaml-close">✕</button>
         </div>
-        <pre class="te-yaml-code" id="yaml-code">${this._escHtml(text)}</pre>
+        <pre class="te-yaml-code" id="yaml-code">${this._escHtml(this._yamlTabText(this._yamlTab))}</pre>
       </div>
     `;
+    this.shadowRoot.appendChild(overlay);
+
+    const refresh = () => {
+      overlay.querySelector("#yaml-code").textContent = this._yamlTabText(this._yamlTab);
+      overlay.querySelectorAll("#yaml-tab-seg button").forEach((btn) => {
+        btn.classList.toggle("on", btn.dataset.yamlTab === this._yamlTab);
+      });
+    };
+
+    overlay.querySelectorAll("#yaml-tab-seg button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        this._yamlTab = btn.dataset.yamlTab;
+        refresh();
+      });
+    });
+
+    const yamlCopyBtn = overlay.querySelector("#yaml-copy");
+    yamlCopyBtn.addEventListener("click", async () => {
+      const text = overlay.querySelector("#yaml-code").textContent;
+      const ok = await this._copyToClipboard(text);
+      yamlCopyBtn.textContent = ok ? "Copied!" : "Copy failed - select manually";
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(overlay.querySelector("#yaml-code"));
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      setTimeout(() => {
+        if (overlay.querySelector("#yaml-copy")) overlay.querySelector("#yaml-copy").textContent = "Copy";
+      }, ok ? 1500 : 3000);
+    });
+
+    overlay.querySelector("#yaml-download").addEventListener("click", () => {
+      const text = overlay.querySelector("#yaml-code").textContent;
+      const suffix = this._yamlTab === "card" ? "-card-mod" : this._yamlTab === "background" ? "-background" : "";
+      const blob = new Blob([text], { type: "text/yaml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${this._themeName || "theme"}${suffix}.yaml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    overlay.querySelector("#yaml-close").addEventListener("click", () => overlay.remove());
   }
 
   _escHtml(str) {
@@ -2251,8 +2337,7 @@ class ThemeEditorCard extends HTMLElement {
       this._render();
     });
     root.getElementById("btn-yaml-toggle").addEventListener("click", () => {
-      this._showYaml = !this._showYaml;
-      this._render();
+      this._openYamlDialog();
     });
     root.getElementById("btn-save").addEventListener("click", () => {
       this._dirtyCount = 0;
@@ -2356,53 +2441,6 @@ class ThemeEditorCard extends HTMLElement {
     if (fullPreviewBtn) fullPreviewBtn.addEventListener("click", () => this._openFullPreviewDialog());
     const compareShapesBtn = root.getElementById("btn-compare-shapes");
     if (compareShapesBtn) compareShapesBtn.addEventListener("click", () => this._openVariantGalleryDialog());
-
-    // YAML drawer
-    const yamlTabSeg = root.getElementById("yaml-tab-seg");
-    if (yamlTabSeg) {
-      yamlTabSeg.querySelectorAll("button").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          this._yamlTab = btn.dataset.yamlTab;
-          this._render();
-        });
-      });
-    }
-    const yamlCopyBtn = root.getElementById("yaml-copy");
-    if (yamlCopyBtn) {
-      yamlCopyBtn.addEventListener("click", async () => {
-        const text = root.getElementById("yaml-code").textContent;
-        try {
-          await navigator.clipboard.writeText(text);
-          yamlCopyBtn.textContent = "Copied!";
-          setTimeout(() => {
-            if (root.getElementById("yaml-copy")) root.getElementById("yaml-copy").textContent = "Copy";
-          }, 1500);
-        } catch (e) {
-          // clipboard unavailable - user can select the code block manually
-        }
-      });
-    }
-    const yamlDownloadBtn = root.getElementById("yaml-download");
-    if (yamlDownloadBtn) {
-      yamlDownloadBtn.addEventListener("click", () => {
-        const text = root.getElementById("yaml-code").textContent;
-        const suffix = this._yamlTab === "card" ? "-card-mod" : this._yamlTab === "background" ? "-background" : "";
-        const blob = new Blob([text], { type: "text/yaml" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${this._themeName || "theme"}${suffix}.yaml`;
-        a.click();
-        URL.revokeObjectURL(url);
-      });
-    }
-    const yamlCloseBtn = root.getElementById("yaml-close");
-    if (yamlCloseBtn) {
-      yamlCloseBtn.addEventListener("click", () => {
-        this._showYaml = false;
-        this._render();
-      });
-    }
 
     // <1024px: preview becomes a collapsible panel, toggled by a button CSS
     // only shows at that width (see _css() .te-preview-toggle media rule)
@@ -2563,16 +2601,12 @@ class ThemeEditorCard extends HTMLElement {
     overlay.querySelectorAll(".te-vg-copy").forEach((btn) => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(`card_mod:\n  class: ${btn.dataset.class}`);
-          const original = btn.textContent;
-          btn.textContent = "Copied!";
-          setTimeout(() => {
-            btn.textContent = original;
-          }, 1500);
-        } catch (err) {
-          // clipboard unavailable - non-fatal, button still shows the value to copy manually
-        }
+        const original = btn.textContent;
+        const ok = await this._copyToClipboard(`card_mod:\n  class: ${btn.dataset.class}`);
+        btn.textContent = ok ? "Copied!" : "Copy failed - value shown above";
+        setTimeout(() => {
+          btn.textContent = original;
+        }, ok ? 1500 : 3000);
       });
     });
   }
@@ -2749,7 +2783,7 @@ class ThemeEditorCard extends HTMLElement {
         container-type: inline-size;
         container-name: te;
         display: grid;
-        grid-template-rows: 56px 1fr auto;
+        grid-template-rows: 56px 1fr;
         background: var(--te-app);
         color: var(--te-text);
         flex: 1;
@@ -2960,7 +2994,12 @@ class ThemeEditorCard extends HTMLElement {
       .mockup-badge.error { background: rgba(224,112,95,.16); color: var(--error-color, #e0705f); }
 
       /* ---------- YAML drawer ---------- */
-      .te-yaml-drawer { height: 260px; flex-shrink: 0; background: #0b1216; border-top: 1px solid var(--te-border-str); display: flex; flex-direction: column; }
+      .te-dialog-yaml {
+        width: min(1100px, 96vw); height: min(720px, 88vh);
+        display: flex; flex-direction: column; padding: 0; overflow: hidden;
+        background: #0b1216;
+      }
+      .te-dialog-yaml .te-yaml-head { padding: 10px 16px; }
       .te-yaml-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #1a252b; flex-shrink: 0; }
       .te-yaml-guide-link { font-size: 11.5px; color: var(--te-accent); text-decoration: none; white-space: nowrap; }
       .te-yaml-guide-link:hover { text-decoration: underline; }

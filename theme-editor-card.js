@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.0";
+const CARD_VERSION = "2.0.1";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -2730,10 +2730,11 @@ class ThemeEditorCard extends HTMLElement {
         --te-border: #223038; --te-border-str: #22323c; --te-text: #e7edf1; --te-text-2: #9fb2bd;
         --te-text-3: #62798a; --te-accent: #7fb2e5; --te-active-bg: #1b2a34; --te-dirty: #d8b46a;
         display: block;
+        height: 100vh;
         font-family: 'IBM Plex Sans', -apple-system, sans-serif;
       }
       * { box-sizing: border-box; }
-      ha-card { padding: 0; overflow: hidden; background: var(--te-app); border-radius: 10px; }
+      ha-card { padding: 0; overflow: hidden; background: var(--te-app); border-radius: 10px; height: 100%; display: flex; flex-direction: column; }
 
       button { font-family: inherit; cursor: pointer; }
       input { font-family: inherit; }
@@ -2750,7 +2751,8 @@ class ThemeEditorCard extends HTMLElement {
         grid-template-rows: 56px 1fr auto;
         background: var(--te-app);
         color: var(--te-text);
-        min-height: 560px;
+        flex: 1;
+        min-height: 0;
       }
 
       /* ---------- Topbar ---------- */
@@ -2813,14 +2815,13 @@ class ThemeEditorCard extends HTMLElement {
       .te-nav-row.on .te-nav-count { color: #9dc4e6; }
 
       .te-content { flex: 1; min-width: 0; overflow-y: auto; padding: 20px 24px 40px; }
-      .te-content-inner { max-width: 760px; }
+      .te-content-inner { max-width: none; }
       .te-content-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
       .te-content-head h2 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
       .te-content-count { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6d8797; }
       .te-content-hint { font-size: 13px; line-height: 1.55; color: #90a5b2; margin-bottom: 20px; max-width: 620px; }
 
-      .te-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
-      @container te (max-width: 1279px) { .te-field-grid { grid-template-columns: 1fr; } }
+      .te-field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px 14px; }
 
       .te-field-row {
         display: flex; align-items: center; gap: 10px; height: 48px;
@@ -2857,9 +2858,8 @@ class ThemeEditorCard extends HTMLElement {
       .te-adv-block-title { font-size: 13px; font-weight: 600; color: #dbe6ed; }
       .te-adv-block-note { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6d8797; }
 
-      .te-shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-      .te-shape-grid-4 { grid-template-columns: repeat(4, 1fr); }
-      @container te (max-width: 700px) { .te-shape-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-shape-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+      .te-shape-grid-4 { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
       .te-shape-tile {
         display: flex; flex-direction: column; gap: 8px; align-items: stretch;
         padding: 10px; border-radius: 9px; background: var(--te-surface); border: 1px solid var(--te-border);
@@ -2873,8 +2873,7 @@ class ThemeEditorCard extends HTMLElement {
       .toggle-preview-sharp, .toggle-preview-sharp .knob { border-radius: 0 !important; }
       .toggle-preview-neon-track { box-shadow: 0 0 8px color-mix(in srgb, var(--primary-color, #7fb2e5) 55%, transparent); }
 
-      .te-anim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-      @container te (max-width: 700px) { .te-anim-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-anim-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
       .te-anim-tile {
         display: flex; align-items: center; gap: 8px; width: 100%; height: 36px;
         padding: 0 10px; border-radius: 7px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px;
@@ -2896,8 +2895,7 @@ class ThemeEditorCard extends HTMLElement {
       .te-transition-row input[type="range"] { flex: 1; accent-color: var(--te-accent); }
       .te-transition-val { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9dc4e6; width: 56px; text-align: right; }
 
-      .te-bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-      @container te (max-width: 700px) { .te-bg-grid { grid-template-columns: repeat(2, 1fr); } }
+      .te-bg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
       .te-bg-tile {
         display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 9px;
         background: var(--te-surface); border: 1px solid var(--te-border); color: var(--te-text-2);

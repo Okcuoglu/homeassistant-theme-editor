@@ -21,13 +21,14 @@ started, no restart needed to try ideas.
   touching your real dashboard
 - 📚 **Starter preset library** - three built-in themes (Warm Amber
   Technical, Cyber Cyan, Minimal Light) to load as a jumping-off point
-- ✨ **Advanced (card-mod) tab** - since animations and per-card variety
-  need CSS injection, not just theme variables, this generates a ready
+- ✨ **Advanced (card-mod) tab** - inline, collapsible, right below the
+  preview (no popup) - since animations and per-card variety need CSS
+  injection, not just theme variables, this generates a ready
   [card-mod](https://github.com/thomasloven/lovelace-card-mod) snippet:
   hover-elevate animation, a global default card style (Elevated / Flat /
   Outlined / Glass-Holo with a theme-color-driven glow pulse), adjustable
   transition speed, and opt-in per-card classes for exceptions - **and you
-  can see all of it live in the mockup preview** while you tune it, using
+  can see all of it live in the preview above it** while you tune it, using
   the exact same CSS that gets exported
 - 📱 **Desktop/Mobile preview toggle** - see how your theme looks on a
   phone-width layout, not just desktop

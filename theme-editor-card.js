@@ -8,7 +8,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "1.4.0";
+const CARD_VERSION = "1.5.0";
 
 /* ---------------------------------------------------------------------- */
 /* Built-in starter presets (library)                                     */
@@ -456,6 +456,7 @@ class ThemeEditorCard extends HTMLElement {
     this._activeMode = null; // null = base (both modes), or "light" / "dark"
     this._previewDevice = "desktop"; // "desktop" | "mobile"
     this._advanced = { hoverElevate: true, variant: "elevated", transitionMs: 200 };
+    this._advancedOpen = false;
     this._themeName = "my_custom_theme";
     this._openGroups = new Set([FIELD_GROUPS[0].id]);
   }
@@ -528,7 +529,6 @@ class ThemeEditorCard extends HTMLElement {
           </div>
           <div class="header-actions">
             <button class="btn-flat" id="btn-presets">Presets</button>
-            <button class="btn-flat" id="btn-advanced">Advanced</button>
             <button class="btn-flat" id="btn-import">Import</button>
             <button class="btn-flat" id="btn-reset">Reset</button>
           </div>
@@ -568,6 +568,16 @@ class ThemeEditorCard extends HTMLElement {
           ${this._previewHtml()}
         </div>
 
+        <div class="group advanced-group ${this._advancedOpen ? "open" : ""}">
+          <button class="group-header" data-toggle-advanced>
+            <span class="chevron">${this._advancedOpen ? "▾" : "▸"}</span>
+            <span>Advanced (card-mod)</span>
+          </button>
+          <div class="group-body advanced-body" ${this._advancedOpen ? "" : 'style="display:none"'}>
+            ${this._advancedBodyHtml()}
+          </div>
+        </div>
+
         <div class="groups" id="groups">
           ${FIELD_GROUPS.map((g) => this._groupHtml(g)).join("")}
         </div>
@@ -582,6 +592,7 @@ class ThemeEditorCard extends HTMLElement {
     this._applyPreviewVars();
     this._applyAdvancedPreview();
     this._bindEvents();
+    this._bindAdvancedControls();
   }
 
   _groupHtml(group) {
@@ -703,7 +714,7 @@ class ThemeEditorCard extends HTMLElement {
       this._saveToStorage();
     });
 
-    root.querySelectorAll(".group-header").forEach((btn) => {
+    root.querySelectorAll(".group-header[data-toggle]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const id = btn.dataset.toggle;
         if (this._openGroups.has(id)) this._openGroups.delete(id);
@@ -711,6 +722,14 @@ class ThemeEditorCard extends HTMLElement {
         this._render();
       });
     });
+
+    const advToggle = root.querySelector("[data-toggle-advanced]");
+    if (advToggle) {
+      advToggle.addEventListener("click", () => {
+        this._advancedOpen = !this._advancedOpen;
+        this._render();
+      });
+    }
 
     root.querySelectorAll(".mode-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -779,7 +798,6 @@ class ThemeEditorCard extends HTMLElement {
 
     root.getElementById("btn-import").addEventListener("click", () => this._openImportDialog());
     root.getElementById("btn-presets").addEventListener("click", () => this._openPresetsDialog());
-    root.getElementById("btn-advanced").addEventListener("click", () => this._openAdvancedDialog());
 
     root.getElementById("btn-copy").addEventListener("click", async () => {
       const yaml = buildYaml(this._themeName, this._values, this._modeValues);
@@ -812,96 +830,88 @@ class ThemeEditorCard extends HTMLElement {
     }, 3000);
   }
 
-  _openAdvancedDialog() {
-    const existing = this.shadowRoot.getElementById("advanced-overlay");
-    if (existing) existing.remove();
+  _advancedBodyHtml() {
+    return `
+      <div class="dialog-sub">
+        Theme variables alone can't do animations or per-card variety - that needs
+        <strong>card-mod</strong> (a separate, very popular HACS integration). This generates
+        a ready-to-paste snippet: a global default look for every card, plus opt-in classes
+        for individual cards. Colors reference your theme variables, so it adapts to whatever
+        you've set above - and updates live in the preview as you tweak it.
+      </div>
 
-    const overlay = document.createElement("div");
-    overlay.id = "advanced-overlay";
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="dialog dialog-wide">
-        <div class="dialog-title">Advanced (card-mod)</div>
-        <div class="dialog-sub">
-          Theme variables alone can't do animations or per-card variety - that needs
-          <strong>card-mod</strong> (a separate, very popular HACS integration). This generates
-          a ready-to-paste snippet: a global default look for every card, plus opt-in classes
-          for individual cards. Colors reference your theme variables, so it adapts to whatever
-          you've set above.
-        </div>
+      <div class="adv-controls">
+        <label class="adv-row">
+          <input type="checkbox" id="adv-hover" ${this._advanced.hoverElevate ? "checked" : ""} />
+          Hover-elevate animation (card lifts slightly on mouseover)
+        </label>
 
-        <div class="adv-controls">
-          <label class="adv-row">
-            <input type="checkbox" id="adv-hover" ${this._advanced.hoverElevate ? "checked" : ""} />
-            Hover-elevate animation (card lifts slightly on mouseover)
-          </label>
+        <label class="adv-row">
+          <span>Global default card variant</span>
+          <select id="adv-variant">
+            <option value="none" ${this._advanced.variant === "none" ? "selected" : ""}>None (plain)</option>
+            <option value="elevated" ${this._advanced.variant === "elevated" ? "selected" : ""}>Elevated (shadow)</option>
+            <option value="flat" ${this._advanced.variant === "flat" ? "selected" : ""}>Flat (no border/shadow)</option>
+            <option value="outlined" ${this._advanced.variant === "outlined" ? "selected" : ""}>Outlined (border only)</option>
+            <option value="glass" ${this._advanced.variant === "glass" ? "selected" : ""}>Glass / Holo (blur + glow pulse)</option>
+          </select>
+        </label>
 
-          <label class="adv-row">
-            <span>Global default card variant</span>
-            <select id="adv-variant">
-              <option value="none" ${this._advanced.variant === "none" ? "selected" : ""}>None (plain)</option>
-              <option value="elevated" ${this._advanced.variant === "elevated" ? "selected" : ""}>Elevated (shadow)</option>
-              <option value="flat" ${this._advanced.variant === "flat" ? "selected" : ""}>Flat (no border/shadow)</option>
-              <option value="outlined" ${this._advanced.variant === "outlined" ? "selected" : ""}>Outlined (border only)</option>
-              <option value="glass" ${this._advanced.variant === "glass" ? "selected" : ""}>Glass / Holo (blur + glow pulse)</option>
-            </select>
-          </label>
+        <label class="adv-row">
+          <span>Transition speed: <strong id="adv-ms-label">${this._advanced.transitionMs}ms</strong></span>
+          <input type="range" id="adv-ms" min="50" max="600" step="10" value="${this._advanced.transitionMs}" />
+        </label>
+      </div>
 
-          <label class="adv-row">
-            <span>Transition speed: <strong id="adv-ms-label">${this._advanced.transitionMs}ms</strong></span>
-            <input type="range" id="adv-ms" min="50" max="600" step="10" value="${this._advanced.transitionMs}" />
-          </label>
-        </div>
+      <div class="adv-yaml-label">Paste this into your theme file (merges alongside the fields above):</div>
+      <textarea id="adv-yaml-out" rows="10" readonly></textarea>
 
-        <div class="adv-yaml-label">Paste this into your theme file (merges alongside the fields above):</div>
-        <textarea id="adv-yaml-out" rows="12" readonly></textarea>
+      <div class="dialog-sub">
+        To use a variant on just one card instead of the global default, add to that card's
+        config:
+        <code>card_mod:\u000A&nbsp;&nbsp;class: flat</code> (or <code>elevated</code> / <code>outlined</code> / <code>glass-holo</code>).
+      </div>
 
-        <div class="dialog-sub">
-          To use a variant on just one card instead of the global default, add to that card's
-          config:
-          <code>card_mod:\u000A&nbsp;&nbsp;class: flat</code> (or <code>elevated</code> / <code>outlined</code> / <code>glass-holo</code>).
-        </div>
-
-        <div class="dialog-actions">
-          <button class="btn-flat" id="adv-close">Close</button>
-          <button class="btn" id="adv-copy">Copy YAML</button>
-        </div>
+      <div class="adv-actions">
+        <button class="btn" id="adv-copy">Copy YAML</button>
       </div>
     `;
-    this.shadowRoot.appendChild(overlay);
+  }
 
-    const refreshYaml = () => {
-      const out = overlay.querySelector("#adv-yaml-out");
+  _bindAdvancedControls() {
+    const root = this.shadowRoot;
+    const out = root.getElementById("adv-yaml-out");
+    if (!out) return; // panel is collapsed, nothing to bind
+
+    const refresh = () => {
       out.value = buildCardModSnippet(this._themeName, this._advanced);
       this._applyAdvancedPreview();
     };
-    refreshYaml();
+    refresh();
 
-    overlay.querySelector("#adv-hover").addEventListener("change", (e) => {
+    root.getElementById("adv-hover").addEventListener("change", (e) => {
       this._advanced.hoverElevate = e.target.checked;
       this._saveToStorage();
-      refreshYaml();
+      refresh();
     });
-    overlay.querySelector("#adv-variant").addEventListener("change", (e) => {
+    root.getElementById("adv-variant").addEventListener("change", (e) => {
       this._advanced.variant = e.target.value;
       this._saveToStorage();
-      refreshYaml();
+      refresh();
     });
-    overlay.querySelector("#adv-ms").addEventListener("input", (e) => {
+    root.getElementById("adv-ms").addEventListener("input", (e) => {
       this._advanced.transitionMs = parseInt(e.target.value, 10);
-      overlay.querySelector("#adv-ms-label").textContent = `${this._advanced.transitionMs}ms`;
+      root.getElementById("adv-ms-label").textContent = `${this._advanced.transitionMs}ms`;
       this._saveToStorage();
-      refreshYaml();
+      refresh();
     });
-    overlay.querySelector("#adv-close").addEventListener("click", () => overlay.remove());
-    overlay.querySelector("#adv-copy").addEventListener("click", async () => {
-      const yaml = overlay.querySelector("#adv-yaml-out").value;
+    root.getElementById("adv-copy").addEventListener("click", async () => {
       try {
-        await navigator.clipboard.writeText(yaml);
-        overlay.querySelector("#adv-copy").textContent = "Copied!";
+        await navigator.clipboard.writeText(out.value);
+        const btn = root.getElementById("adv-copy");
+        btn.textContent = "Copied!";
         setTimeout(() => {
-          const btn = overlay.querySelector("#adv-copy");
-          if (btn) btn.textContent = "Copy YAML";
+          if (root.getElementById("adv-copy")) root.getElementById("adv-copy").textContent = "Copy YAML";
         }, 2000);
       } catch (e) {
         // clipboard API unavailable - user can select the textarea manually
@@ -1082,6 +1092,8 @@ class ThemeEditorCard extends HTMLElement {
       .chevron { width: 10px; display: inline-block; opacity: 0.7; }
       .group-body { padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
       @media (max-width: 500px) { .group-body { grid-template-columns: 1fr; } }
+      .advanced-body { display: block !important; }
+      .adv-actions { margin-top: 10px; }
 
       .field { display: flex; flex-direction: column; gap: 4px; }
       .field label { font-size: 12px; color: var(--secondary-text-color, #888); }

@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.4.0";
+const CARD_VERSION = "2.5.0";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -1638,6 +1638,32 @@ function buildBackgroundYaml(backgroundId) {
   return lines.join("\n") + "\n";
 }
 
+// Merges Variables + Card Shape + Background into one ready-to-paste theme
+// file, exactly matching the structure documented in YAML-GUIDE.md's
+// "Combining all three into one file" section - so the person doesn't have
+// to do that stacking by hand. Card Shape is always included (it reflects
+// whatever the Advanced section's current state is, same as its own tab
+// always does); Background is only included if one is actually selected.
+function buildCombinedYaml(themeName, values, modeValues, advanced) {
+  const varsYaml = buildYaml(themeName, values, modeValues).replace(/\n+$/, "");
+  const cardSnippet = buildCardModSnippet(themeName, advanced).replace(/\n+$/, "");
+  const lines = [varsYaml, "", cardSnippet];
+
+  const bgRaw = buildBackgroundYaml(advanced.background);
+  if (bgRaw) {
+    // buildBackgroundYaml's output is un-indented (designed to be shown
+    // standalone) - re-indent by 2 spaces to nest it under the theme name.
+    const bgIndented = bgRaw
+      .replace(/\n+$/, "")
+      .split("\n")
+      .map((line) => (line ? `  ${line}` : line))
+      .join("\n");
+    lines.push("", bgIndented);
+  }
+
+  return lines.join("\n") + "\n";
+}
+
 
 const DEFAULT_ADVANCED_STATE = {
   variant: "elevated",
@@ -1845,7 +1871,7 @@ class ThemeEditorCard extends HTMLElement {
     this._advanced = { ...DEFAULT_ADVANCED_STATE, animations: { ...DEFAULT_ADVANCED_STATE.animations } };
     this._themeName = "my_custom_theme";
     this._activeSection = "advanced";
-    this._yamlTab = "vars"; // "vars" | "card" | "background"
+    this._yamlTab = "combined"; // "combined" | "vars" | "card" | "background"
     this._dirtyCount = 0;
     this._navMobileOpen = false; // <1024px: preview becomes a collapsible panel
   }
@@ -2435,6 +2461,7 @@ class ThemeEditorCard extends HTMLElement {
   }
 
   _yamlTabText(tab) {
+    if (tab === "combined") return buildCombinedYaml(this._themeName, this._values, this._modeValues, this._advanced);
     if (tab === "card") return buildCardModSnippet(this._themeName, this._advanced);
     if (tab === "background") {
       return (
@@ -2445,11 +2472,21 @@ class ThemeEditorCard extends HTMLElement {
     return buildYaml(this._themeName, this._values, this._modeValues);
   }
 
+  _yamlHintText() {
+    if (this._yamlTab === "combined") {
+      return "Ready to use: Variables + Card Shape + Background merged into one file. Save this directly as /config/themes/<name>.yaml.";
+    }
+    if (this._yamlTab === "card") return "Card shapes/animations only - needs card-mod. Merge with the other tabs, or just use \"✓ Combined\".";
+    if (this._yamlTab === "background") return "Dashboard background only - needs card-mod, different injection point than Card Shape. Or just use \"✓ Combined\".";
+    return "Colors and sizes only, no card-mod needed. Or just use \"✓ Combined\" to include everything.";
+  }
+
   _openYamlDialog() {
     const existing = this.shadowRoot.getElementById("yaml-overlay");
     if (existing) existing.remove();
 
     const tabs = [
+      { id: "combined", label: "✓ Combined" },
       { id: "vars", label: "Variables" },
       { id: "card", label: "Card Shape" },
       { id: "background", label: "Background" },
@@ -2470,6 +2507,7 @@ class ThemeEditorCard extends HTMLElement {
           <button class="te-btn te-btn-small" id="yaml-copy">Copy</button>
           <button class="te-btn te-btn-small" id="yaml-download">Load .yaml</button>
         </div>
+        <div class="te-yaml-hint" id="yaml-hint">${this._yamlHintText()}</div>
         <pre class="te-yaml-code" id="yaml-code">${this._escHtml(this._yamlTabText(this._yamlTab))}</pre>
       </div>
     `;
@@ -2477,6 +2515,7 @@ class ThemeEditorCard extends HTMLElement {
 
     const refresh = () => {
       overlay.querySelector("#yaml-code").textContent = this._yamlTabText(this._yamlTab);
+      overlay.querySelector("#yaml-hint").textContent = this._yamlHintText();
       overlay.querySelectorAll("#yaml-tab-seg button").forEach((btn) => {
         btn.classList.toggle("on", btn.dataset.yamlTab === this._yamlTab);
       });
@@ -3337,6 +3376,10 @@ class ThemeEditorCard extends HTMLElement {
       }
       .te-yaml-guide-link { font-size: 11.5px; color: var(--te-accent); text-decoration: none; white-space: nowrap; }
       .te-yaml-guide-link:hover { text-decoration: underline; }
+      .te-yaml-hint {
+        font-size: 11.5px; color: var(--te-text-3); padding: 0 16px 8px;
+        border-bottom: 1px solid #1a252b;
+      }
       .te-yaml-code {
         margin: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 12px 16px;
         font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8;

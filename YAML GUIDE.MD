@@ -1,5 +1,16 @@
 # Working With the Generated YAML
 
+**Fastest path: open the YAML popup (topbar → YAML) and use the
+"✓ Combined" tab (it's the default).** It automatically merges Variables,
+Card Shape, and Background into one ready-to-paste file - no manual
+stacking needed. Save its contents directly as
+`/config/themes/<your_theme>.yaml` and skip to
+[Installing a theme](#installing-a-theme).
+
+The rest of this guide explains what "Combined" is doing under the hood,
+and covers the individual tabs for when you want just one piece (e.g.
+pasting only the Background block into a single view's own config).
+
 The YAML popup has three tabs - **Variables**, **Card Shape**, and
 **Background**. They're separate tabs because they're separate concerns
 (and, for Card Shape/Background, a separate card-mod feature), but they all
@@ -46,12 +57,15 @@ a future HA version adds something new before this card catches up.
 
 | Tab | What it contains | Requires card-mod? |
 |---|---|---|
+| **✓ Combined** | All three below, already merged into one file | Only if Card Shape/Background actually need it - harmless either way |
 | **Variables** | Your color/spacing values as a flat (or `modes:`-nested) block under your theme name | No - plain HA theming |
 | **Card Shape** | `card-mod-theme:` + `card-mod-card:` keys - the global card look plus opt-in per-card shape classes | Yes |
 | **Background** | `card-mod-view:` key - an animated dashboard background, a different injection point from Card Shape | Yes |
 
-If you never touched the Advanced section, you only need the **Variables**
-tab - skip straight to [Installing a theme](#installing-a-theme).
+Using **Combined**, you never need to touch the other three tabs at all -
+they exist for when you want just one piece on its own (e.g. pasting only
+the Background block into a single view's own config, as described
+further down).
 
 ## Combining all three into one file
 

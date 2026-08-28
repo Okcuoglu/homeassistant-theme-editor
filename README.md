@@ -94,8 +94,11 @@ column of accordions:
   "any variable" field for anything else
 - 📥 **Import** an existing theme YAML (flat, or with a `modes:` block) to
   keep editing it
-- 📋 **Export** via clipboard copy or `.yaml` file download, per YAML popup
-  tab (variables / card shape / background separately)
+- 📋 **Export** via clipboard copy or `.yaml` file download, with a
+  **"✓ Combined" tab (the default)** that automatically merges Variables,
+  Card Shape, and Background into one ready-to-paste file - no manual
+  stacking required, plus the three individual tabs for when you want
+  just one piece on its own
 - 💾 Autosaves your work-in-progress to browser `localStorage` so a refresh
   won't lose your edits, plus an explicit **Save** with an unsaved-changes
   counter for peace of mind

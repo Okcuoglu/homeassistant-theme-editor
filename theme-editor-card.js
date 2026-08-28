@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.0.4";
+const CARD_VERSION = "2.0.5";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -2241,6 +2241,7 @@ class ThemeEditorCard extends HTMLElement {
     overlay.className = "te-overlay";
     overlay.innerHTML = `
       <div class="te-dialog te-dialog-yaml">
+        <button class="te-btn te-btn-icon te-yaml-close-fixed" id="yaml-close" title="Close" aria-label="Close">✕</button>
         <div class="te-yaml-head">
           <div class="te-seg" id="yaml-tab-seg">
             ${tabs.map((t) => `<button data-yaml-tab="${t.id}" class="${this._yamlTab === t.id ? "on" : ""}">${t.label}</button>`).join("")}
@@ -2249,7 +2250,6 @@ class ThemeEditorCard extends HTMLElement {
           <a class="te-yaml-guide-link" href="https://github.com/Okcuoglu/homeassistant-theme-editor/blob/main/YAML-GUIDE.md" target="_blank" rel="noopener">How do I use this? ↗</a>
           <button class="te-btn te-btn-small" id="yaml-copy">Copy</button>
           <button class="te-btn te-btn-small" id="yaml-download">Load .yaml</button>
-          <button class="te-btn te-btn-icon" id="yaml-close">✕</button>
         </div>
         <pre class="te-yaml-code" id="yaml-code">${this._escHtml(this._yamlTabText(this._yamlTab))}</pre>
       </div>
@@ -2993,14 +2993,17 @@ class ThemeEditorCard extends HTMLElement {
       .mockup-badge.warning { background: rgba(224,178,95,.16); color: var(--warning-color, #e0b25f); }
       .mockup-badge.error { background: rgba(224,112,95,.16); color: var(--error-color, #e0705f); }
 
-      /* ---------- YAML drawer ---------- */
+      /* ---------- YAML dialog ---------- */
       .te-dialog-yaml {
-        width: min(1100px, 96vw); height: min(720px, 88vh);
+        width: clamp(600px, 92vw, 1500px); height: clamp(500px, 88vh, 950px);
         display: flex; flex-direction: column; padding: 0; overflow: hidden;
-        background: #0b1216;
+        background: #0b1216; position: relative;
       }
-      .te-dialog-yaml .te-yaml-head { padding: 10px 16px; }
-      .te-yaml-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #1a252b; flex-shrink: 0; }
+      .te-dialog-yaml .te-yaml-head { padding: 10px 56px 10px 16px; } /* right padding clears the fixed close button */
+      .te-yaml-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 16px; border-bottom: 1px solid #1a252b; flex-shrink: 0; }
+      .te-yaml-close-fixed {
+        position: absolute; top: 10px; right: 12px; z-index: 2;
+      }
       .te-yaml-guide-link { font-size: 11.5px; color: var(--te-accent); text-decoration: none; white-space: nowrap; }
       .te-yaml-guide-link:hover { text-decoration: underline; }
       .te-yaml-code { margin: 0; flex: 1; overflow: auto; padding: 12px 16px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; line-height: 1.6; color: #b9cdd8; white-space: pre; }

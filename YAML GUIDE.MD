@@ -213,6 +213,18 @@ if changing one set doesn't visibly do anything, try the other. This is
 an area Home Assistant itself has changed more than once, so don't be
 surprised if it needs revisiting after a future HA update.
 
+**A dropdown/select row stays white even with a dark theme active - especially "unavailable" ones.**
+Confirmed by multiple Home Assistant community reports since the 2026.4
+MD3 migration: components like `ha-combo-box`, `ha-select`, and `md-item`
+don't automatically inherit your card background - they default to a
+plain white MD3 surface until you explicitly set `ha-color-form-background`
+(Input Fields section). Disabled/"unavailable" rows specifically need
+`ha-color-form-background-disabled` set too, since they don't fall back
+to the regular one. If it still doesn't apply: confirm the theme you're
+actually looking at includes these values (re-check the Combined tab
+after setting them), and remember this needs a HA restart plus a hard
+browser refresh, same as any other theme change.
+
 **Native Home Assistant dialogs (like HACS's own download screen) look
 slightly off - dropdowns, fonts, spacing.**
 This isn't a card bug. The `paper-font-*` variables in the Typography

@@ -11,7 +11,7 @@
  */
 
 const STORAGE_KEY = "theme-editor-card-state-v1";
-const CARD_VERSION = "2.6.0";
+const CARD_VERSION = "2.6.1";
 
 /* ---------------------------------------------------------------------- */
 /* Variable schema                                                        */
@@ -1057,7 +1057,7 @@ const FIELD_GROUPS = [
   {
     id: "inputs",
     label: "Input Fields",
-    hint: "Backgrounds and text of text fields, dropdowns, and search boxes across ALL of Home Assistant (not just cards) - e.g. the automation editor, entity search, HACS dialogs. These variable names have shifted across recent HA versions (Material Design 3 migration in 2026.4 introduced the md-sys-color-* set, and ha-color-form-background is a further newer token) - if one set doesn't visibly apply on your HA version, try the others.",
+    hint: "Backgrounds and text of text fields, dropdowns, and search boxes across ALL of Home Assistant (not just cards) - e.g. the automation editor, entity search, HACS dialogs, and dropdown/select rows inline in Entities cards. HA's own MD3 migration doesn't make these inherit your card background automatically - ha-combo-box/ha-select/md-item default to a plain white surface until you set ha-color-form-background (and its -hover/-disabled variants) explicitly, confirmed by multiple Home Assistant community reports of exactly this since the 2026.4 update.",
     fields: [
       { key: "input-fill-color", label: "Fill (legacy)", type: "color", default: "#1e1e1e" },
       { key: "input-ink-color", label: "Text (legacy)", type: "color", default: "#ffffff" },
@@ -1072,6 +1072,8 @@ const FIELD_GROUPS = [
       { key: "md-sys-color-on-surface", label: "MD3 text on surface", type: "color", default: "#ffffff" },
       { key: "md-sys-color-on-surface-variant", label: "MD3 text on surface (muted)", type: "color", default: "#a3a3a3" },
       { key: "ha-color-form-background", label: "Form field background", type: "color", default: "#1e1e1e" },
+      { key: "ha-color-form-background-hover", label: "Form field background (hover)", type: "color", default: "#262626" },
+      { key: "ha-color-form-background-disabled", label: "Form field background (disabled/unavailable)", type: "color", default: "#181818" },
     ],
   },
   {
@@ -2138,7 +2140,7 @@ class ThemeEditorCard extends HTMLElement {
 
   _contentHtml() {
     const s = SECTIONS.find((x) => x.id === this._activeSection) || SECTIONS[0];
-    const count = s.isAdvanced ? "3 groups" : s.isCustom ? `${this._customVarCount()} set` : `${s.fields.length} fields`;
+    const count = s.isAdvanced ? "4 groups" : s.isCustom ? `${this._customVarCount()} set` : `${s.fields.length} fields`;
     const hint = s.isAdvanced
       ? "Shapes, animations, and backgrounds need card-mod. Changes apply instantly in the preview to the right; open the YAML popup (topbar) to export."
       : s.isCustom
@@ -2533,8 +2535,8 @@ class ThemeEditorCard extends HTMLElement {
         </div>
       </div>
       <div class="mockup-card">
-        <div class="pf-title" style="margin-bottom: 12px;">Temperature</div>
-        <div class="pf-select"><span>43 °C</span></div>
+        <div class="pf-title" style="margin-bottom: 12px;">Waschmaschine Programm</div>
+        <div class="pf-select pf-select-disabled"><span>unavailable</span></div>
       </div>
     `;
   }
@@ -3489,6 +3491,10 @@ class ThemeEditorCard extends HTMLElement {
         background: var(--ha-color-form-background, var(--mdc-select-fill-color, var(--md-sys-color-surface-container, var(--input-fill-color, #1e1e1e))));
         color: var(--md-sys-color-on-surface, var(--input-ink-color, var(--primary-text-color, #ffffff)));
         position: relative; z-index: 1;
+      }
+      .pf-select-disabled {
+        background: var(--ha-color-form-background-disabled, var(--ha-color-form-background, #181818));
+        color: var(--disabled-text-color, var(--secondary-text-color, #888));
       }
 
       /* Shared mockup-card look (used by preview frame, full preview, compare gallery) */
